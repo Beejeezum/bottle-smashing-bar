@@ -173,6 +173,18 @@ export class AudioSys {
     this.tone(this.out(0, 0, 1), 'triangle', f, f, this.ctx.currentTime, 0.05, 0.15);
   }
 
+  clank({ pan = 0, vol = 1 } = {}) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(pan, 0.4, vol);
+    [1, 1.51, 2.3, 3.7].forEach((m, i) => this.tone(o, 'square', 780 * m * rnd(0.95, 1.05), 760 * m, t, 0.12 / (i * 0.5 + 1), 0.07));
+    this.burst(o, 'bandpass', 3200, 2400, 2, t, 0.05, 0.4);
+  }
+  pull() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0.2, 0.6, 1);
+    this.tone(o, 'sine', 180, 60, t, 0.16, 0.7); this.burst(o, 'bandpass', 500, 2600, 1.5, t + 0.03, 0.4, 0.3);
+    this.tone(o, 'triangle', 700, 990, t, 0.12, 0.12);
+  }
   step(wood, vol = 1) {
     if (!this.ready) return;
     const t = this.ctx.currentTime, o = this.out(0, wood ? 0.1 : 0.35, vol);

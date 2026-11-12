@@ -71,14 +71,16 @@ const U = drunkPass.uniforms;
 // ---------- state ----------
 const P = { pos: new THREE.Vector3(0, 0, 14.6), vel: new THREE.Vector3(), yaw: 0, pitch: 0.06, bob: 0, lvx: 0, lvy: 0 };
 const D = { level: 0, pending: 0 };
-const G = { score: 0, smashed: 0, streak: 0, best: 0, tab: 0, thrown: 0 };
+const G = { score: 0, smashed: 0, streak: 0, best: 0, tab: 0, thrown: 0, hits: 0, doug: 0 };
 const tray = [];            // drinks in hand, [0] is the one you're holding
 const shots = [];           // bottles in flight
 const keys = {};
 let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
 let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
-let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0;
+let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
+const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
+const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your best night: ${best0.toLocaleString()}`;
 const d01 = () => clamp(D.level / 9, 0, 1);
 
 // ---------- HUD ----------
@@ -129,10 +131,20 @@ const story = new Story({
   saved() {
     G.score += 5000; hudNumbers(); partyT = 6;
     setTimeout(() => { toast('THE BAR IS SAVED'); audio.cheer(1); audio.bell(); }, 900);
+    setTimeout(receipt, 9000);
     sayQ.push(['pem', "Enough! ENOUGH. Keep your wretched bar. I'm going into parking lots."], ['sal', "Bar's staying open, everybody! Next round's on the jar!"], ['', 'After hours now. Everything you break pays double.']);
   },
 });
 let partyT = 0;
+function receipt() {
+  const acc = G.thrown ? Math.round(G.hits / G.thrown * 100) : 0, R = $('#receipt');
+  const row = (a, b) => '<dt>' + a + '</dt><dd>' + b + '</dd>';
+  R.innerHTML = '<h3>THE BOTTLE SMASHING BAR</h3><p>— tonight\'s damage —</p><dl>'
+    + row('Bar tab', '$' + G.tab) + row('Things broken', G.smashed) + row('Bottles thrown', G.thrown) + row('Accuracy', acc + '%')
+    + row('Best streak', G.best) + row('Blackouts', blackouts) + row('Doug incidents', G.doug)
+    + '</dl><b>SCORE ' + G.score.toLocaleString() + '</b><p class="paid">PAID IN FULL · by the jar</p><small>press E to crumple</small>';
+  R.classList.add('on');
+}
 
 // markers above anyone with something to say
 const markTex = (() => {
@@ -281,6 +293,7 @@ addEventListener('contextmenu', e => e.preventDefault());
 
 let talkTo = null;
 function interact() {
+  if ($('#receipt').classList.contains('on')) return $('#receipt').classList.remove('on');
   if (dlg) return advDlg();
   if (talkTo) return startDlg(story.talk(talkTo));
   if (menuOpen) return openMenu(false);
@@ -344,7 +357,7 @@ function updateShots(dt) {
       s.vel.y -= 9.8 * h; s.pos.addScaledVector(s.vel, h);
       const p = s.pos;
       if (Math.hypot(p.x - dg.x, p.z - dg.z) < 0.4 && p.y < 1.9) { // rule three
-        s.hit = true; smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
+        s.hit = true; G.doug++; smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
         fx.popup(p, '-250', 'RULE THREE', 'bad'); dougTalk = 0; dougSay('ow'); audio.thud(range.where(p)); break;
       }
       const hit = range.sweep(_a, p, 0.1);
@@ -374,13 +387,14 @@ function updateShots(dt) {
 
 range.onScore = (pts, label, pos, t, killed) => {
   const s = curShot;
-  if (s && !s.hit) { s.hit = true; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
+  if (s && !s.hit) { s.hit = true; G.hits++; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
   const mult = (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
   const n = Math.max(5, Math.round(pts * mult / 5) * 5);
   G.score += n; if (killed) G.smashed++;
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
   U.uHit.value = 1.5;
-  if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); }
+  if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
+  if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
   story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale });
   hudNumbers();
@@ -500,7 +514,17 @@ function updateDrunk(dt) {
   el.mult.textContent = '×' + ((1 + D.level * 0.3) * (story.phase === 'saved' ? 2 : 1)).toFixed(1);
   el.hud.style.setProperty('--d', d.toFixed(3));
   if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); P.pitch += 0.035; fx.kick = 0.4; } }
-  // heavy eyelids
+  // too far: lights out, and you wake up back at the bar
+  if (D.level >= 9.6 && blackT <= 0) { blackT = 3.4; blackouts++; say('', 'The room folds up like a card table.', 2.5); }
+  if (blackT > 0) {
+    const was = blackT; blackT -= dt;
+    el.lids.style.setProperty('--lid', (blackT > 2.8 ? (3.4 - blackT) / 0.6 : blackT < 0.9 ? Math.max(0, blackT) / 0.9 : 1).toFixed(3));
+    if (was > 1.6 && blackT <= 1.6) {
+      P.pos.set(0.9, 0, -4.2); P.yaw = 0; P.pitch = 0; P.vel.set(0, 0, 0); D.level = 5.2; D.pending = 0; mode = 'idle'; charge = 0;
+      sayQ.push(['sal', pick(["Morning, sunshine. It's been four minutes. Doug carried you back.", 'You fell asleep on the counter. Mid-throw. Impressive, honestly.', 'Welcome back. You missed nothing. You also hit nothing.'])]);
+    }
+    blinkP = 1;
+  } else
   if (blinkP < 1) { blinkP = Math.min(1, blinkP + dt / blinkDur); el.lids.style.setProperty('--lid', Math.sin(blinkP * Math.PI).toFixed(3)); }
   else if (D.level > 5.5) { blinkT -= dt; if (blinkT <= 0) { blinkT = 4 + Math.random() * 6 - d * 3; blinkDur = 0.25 + d * 0.6; blinkP = 0; } }
   U.uDrunk.value = d; U.uTime.value = time;
@@ -555,7 +579,8 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  tick(dt);
+  slow -= dt;
+  tick(slow > 0 ? dt * 0.22 : dt);
   composer.render();
 }
 function tick(dt) {
@@ -567,6 +592,7 @@ function tick(dt) {
   } else if (!started) {
     camera.position.set(Math.sin(time * 0.2) * 0.6, 1.66, 15.2); camera.rotation.set(0.1, Math.sin(time * 0.15) * 0.04, 0);
   }
+  range.active = started && !paused && inRange();
   range.update(dt, time); fx.update(dt);
 }
 requestAnimationFrame(frame);

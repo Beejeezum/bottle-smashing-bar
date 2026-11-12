@@ -104,3 +104,14 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
   #score b { font-size: 44px; } #buzz { width: 200px; } #stats { gap: 14px; } #stats b { font-size: 24px; }
   #prompt { font-size: 18px; bottom: 120px; white-space: normal; text-align: center; width: 86vw; }
 }
+
+.pop.call b { font-family: 'Monoton', cursive; color: var(--cyan); text-shadow: 0 0 14px var(--cyan); font-size: 40px; }
+#best { margin-top: 16px; color: var(--amber); font-size: 20px; opacity: .8; }
+#receipt { position: absolute; left: 50%; top: 50%; width: 300px; padding: 22px 24px 26px; background: #f4efe2; color: #1a1512; font-family: 'Courier New', monospace; letter-spacing: 0; text-align: center; transform: translate(-50%, -40%) rotate(-2deg) scale(.9); opacity: 0; transition: opacity .4s, transform .4s; box-shadow: 0 30px 80px rgba(0,0,0,.7); }
+#receipt.on { opacity: 1; transform: translate(-50%, -50%) rotate(-2deg); }
+#receipt h3 { font-size: 15px; } #receipt p { font-size: 12px; margin: 4px 0 10px; }
+#receipt dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; text-align: left; font-size: 14px; border-top: 1px dashed #1a1512; border-bottom: 1px dashed #1a1512; padding: 9px 0; margin-bottom: 10px; }
+#receipt dd { text-align: right; font-weight: bold; }
+#receipt b { font-size: 20px; display: block; }
+#receipt .paid { color: #b0201c; font-weight: bold; border: 2px solid #b0201c; display: inline-block; padding: 2px 8px; transform: rotate(-5deg); margin-top: 10px; }
+#receipt small { display: block; font-size: 11px; opacity: .6; margin-top: 4px; }

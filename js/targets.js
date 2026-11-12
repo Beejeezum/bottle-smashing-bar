@@ -15,6 +15,7 @@ const lathe = pts => new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0]
 const MILK = lathe([[0, 0], [.055, 0], [.06, .02], [.06, .16], [.03, .24], [.028, .3], [.034, .31], [.034, .32]]);
 const VASE = lathe([[0, 0], [.07, 0], [.12, .12], [.13, .22], [.07, .36], [.05, .42], [.08, .48]]);
 const TROPHY = lathe([[0, 0], [.1, 0], [.1, .03], [.03, .06], [.03, .18], [.13, .3], [.15, .46], [.13, .46], [.11, .32], [0, .2]]);
+const LBASE = new THREE.CylinderGeometry(.045, .08, .1, 16), LCAP = lathe([[.05, 0], [.066, .1], [.05, .28], [.025, .34], [0, .34]]);
 const GOLD = new THREE.MeshStandardMaterial({ color: 0xd9a520, roughness: 0.22, metalness: 1, envMapIntensity: 2.2, side: THREE.DoubleSide });
 let tex = null;
 
@@ -40,8 +41,8 @@ const BUILD = {
     P(g, SPH, BLACK, -.03, .295, .075, .011); P(g, SPH, BLACK, .03, .295, .075, .011);
     return { g, r: 0.2, cy: 0.3 };
   },
-  duck() {
-    const g = new THREE.Group(), y = S(0xffd400, 0.3), or = S(0xff7a00, 0.4);
+  duck(o) {
+    const g = new THREE.Group(), y = o.gold ? GOLD : S(0xffd400, 0.3), or = S(0xff7a00, 0.4);
     P(g, SPH, y, 0, .11, 0, .12, .11, .16); P(g, SPH, y, 0, .25, .08, .078);
     const bk = P(g, CONE, or, 0, .24, .17, .032, .08, .02); bk.rotation.x = Math.PI / 2;
     const tl = P(g, CONE, y, 0, .17, -.15, .05, .1, .05); tl.rotation.x = -0.9;
@@ -125,6 +126,44 @@ const BUILD = {
     disc.castShadow = true; holder.add(disc);
     return { g, r: 0.72, cy: h, disc };
   },
+  can(o) {
+    const g = new THREE.Group();
+    P(g, CYL, S(0xc8ccd0, 0.3, 1), 0, .085, 0, .055, .17, .055); P(g, CYL, S(o.color, 0.5), 0, .085, 0, .0565, .1, .0565);
+    return { g, r: 0.11, cy: 0.085 };
+  },
+  lava(o) {
+    const g = new THREE.Group(), m = S(0x8a8f96, 0.3, 1);
+    P(g, LBASE, m, 0, .05, 0); P(g, LCAP, new THREE.MeshBasicMaterial({ color: new THREE.Color(o.color).multiplyScalar(1.5) }), 0, .1, 0);
+    P(g, CONE, m, 0, .47, 0, .028, .07, .028);
+    return { g, r: 0.16, cy: 0.26 };
+  },
+  fishbowl(o) {
+    const g = new THREE.Group();
+    P(g, SPH, new THREE.MeshStandardMaterial({ color: 0x3aa4e0, transparent: true, opacity: 0.55, roughness: 0.1 }), 0, .15, 0, .15, .125, .15).castShadow = false;
+    const fish = new THREE.Group(); fish.position.y = .15; g.add(fish);
+    P(fish, SPH, S(0xff7a00, 0.4), .08, 0, 0, .016, .024, .038); P(fish, CONE, S(0xff7a00, 0.4), .08, 0, -.05, .02, .035, .006).rotation.x = Math.PI / 2;
+    P(g, SPH, new THREE.MeshStandardMaterial({ color: 0xdfefff, transparent: true, opacity: 0.3, roughness: 0.04, envMapIntensity: 3, depthWrite: false }), 0, .17, 0, .175).castShadow = false;
+    return { g, r: 0.2, cy: 0.17, fish };
+  },
+  cake() {
+    const g = new THREE.Group(), w = S(0xfff6ea, 0.8), p = S(0xff9ac0, 0.8);
+    P(g, CYL, w, 0, .06, 0, .2, .12, .2); P(g, CYL, p, 0, .17, 0, .15, .1, .15); P(g, CYL, w, 0, .265, 0, .1, .09, .1);
+    P(g, SPH, S(0xd61f2c, 0.3), 0, .33, 0, .03);
+    for (let i = 0; i < 8; i++) P(g, SPH, p, Math.cos(i * .785) * .19, .125, Math.sin(i * .785) * .19, .025);
+    return { g, r: 0.26, cy: 0.17 };
+  },
+  flamingo() {
+    const g = new THREE.Group(), p = S(0xff6fae, 0.4);
+    P(g, CYL, S(0x222222, 0.5), 0, .225, 0, .008, .45, .008); P(g, SPH, p, 0, .5, 0, .09, .08, .14);
+    P(g, CYL, p, 0, .66, .1, .02, .26, .02).rotation.x = 0.3; P(g, SPH, p, 0, .8, .15, .042);
+    P(g, CONE, BLACK, 0, .77, .2, .016, .08, .016).rotation.x = 2.2;
+    return { g, r: 0.22, cy: 0.5 };
+  },
+  plate() {
+    const g = new THREE.Group();
+    P(g, CYL, S(0xff6a1a, 0.5), 0, 0, 0, .2, .03, .2); P(g, CYL, S(0x222222, 0.5), 0, .01, 0, .12, .03, .12);
+    return { g, r: 0.3, cy: 0 };
+  },
   trophy() {
     const g = new THREE.Group();
     P(g, TROPHY, GOLD, 0, 0, 0);
@@ -186,6 +225,12 @@ const TYPES = {
   disco: { kind: 'disco', pts: 500, label: 'DISCO BALL', respawn: 30 },
   teddy: { kind: 'knock', pts: 90, label: 'TEDDY', snd: 'thud' },
   bullseye: { kind: 'spin', pts: 100, label: 'BULLSEYE' },
+  can: { kind: 'knock', pts: 60, label: 'CAN', snd: 'clank' },
+  lava: { kind: 'glass', pts: 110, label: 'LAVA LAMP' },
+  fishbowl: { kind: 'glass', pts: 130, label: 'FISHBOWL · FISH IS FINE' },
+  cake: { kind: 'splat', pts: 140, label: 'CAKE', debris: [0xfff6ea, 0xff9ac0, 0xfff6ea, 0xd61f2c] },
+  flamingo: { kind: 'knock', pts: 90, label: 'FLAMINGO', snd: 'thud' },
+  plate: { kind: 'ceramic', pts: 350, label: 'CLAY PIGEON', debris: [0xff6a1a, 0x222222] },
   trophy: { kind: 'ceramic', pts: 1000, label: "PEMBERTON'S TROPHY", debris: [0xd9a520, 0xffe08a], coins: true },
   portrait: { kind: 'ceramic', pts: 1000, label: 'THE PORTRAIT', debris: [0xd9a520, 0x5a3a20, 0xe8d8c0] },
   cat: { kind: 'ceramic', pts: 1000, label: 'MR. WHISKERS', hp: 2, debris: [0xffffff, 0xd61f2c, 0xd9a520] },
@@ -206,7 +251,7 @@ class Target {
     this.deps = []; this.landY = o.landY ?? 0; this.ang = 0; this.angV = 0; this.spinV = 0; this.ph = Math.random() * 6;
     R.scene.add(this.g);
     this.reset(); this.pop = 1;
-    if (o.finale) { this.state = 'gone'; this.g.visible = false; }
+    if (o.finale || o.skeet) { this.state = 'gone'; this.g.visible = false; }
   }
   reset() {
     this.state = 'alive'; this.hp = this.T.hp ?? 1; this.g.visible = true; this.pop = 0;
@@ -240,7 +285,7 @@ class Target {
         this.state = 'fall'; this.life = 5;
         this.v.copy(p.vel).multiplyScalar(0.3); this.v.y += 3.2; this.v.x += 1;
         this.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9));
-        R.audio[T.snd](R.where(this.c)); R.score(this, T.pts, T.label, true);
+        R.audio[T.snd](R.where(this.c)); R.score(this, this.o.pts ?? T.pts, this.o.label ?? T.label, true);
         if (this.type === 'teddy') R.fx.chunkBurst(this.c, p.vel, 0xf5f5f0, 8, 0.03);
         return 'block';
     }
@@ -258,15 +303,15 @@ class Target {
     const T = this.T, R = this.R, fx = R.fx, c = this.c, w = R.where(c);
     this.state = T.husk ? 'husk' : 'dead'; this.g.visible = !!T.husk;
     this.timer = (T.respawn ?? 13) + Math.random() * 5;
-    if (this.o.finale) { this.state = 'gone'; this.g.visible = false; }
+    if (this.o.finale || this.o.skeet) { this.state = 'gone'; this.g.visible = false; }
     switch (T.kind) {
-      case 'glass': fx.glassBurst(c, vel, this.o.color ?? 0xe8f0f2, 26, 0.055); R.audio.smash(w); break;
+      case 'glass': fx.glassBurst(c, vel, this.o.color ?? 0xe8f0f2, 26, 0.055); R.audio.smash(w); if (this.type === 'lava' || this.type === 'fishbowl') fx.sparks(c, this.o.color, 30, 5); break;
       case 'ceramic':
         fx.chunkBurst(c, vel, T.debris, T.big ? 46 : 22, T.big ? 0.1 : 0.055); R.audio.ceramic({ ...w, pitch: T.big ? 0.6 : 1 });
         if (T.coins) { fx.sparks(c, [0xffd400, 0xffb300], 26, 5); R.audio.coins(w); }
         if (T.big) fx.sparks(c, 0x7fd0ff, 40, 6);
         break;
-      case 'splat': fx.chunkBurst(c, vel, [0xe8243a, 0xff5a6a, 0xe8243a, 0x1f6b2a, 0x111111], 40, 0.06); R.audio.splat(w); break;
+      case 'splat': fx.chunkBurst(c, vel, T.debris ?? [0xe8243a, 0xff5a6a, 0xe8243a, 0x1f6b2a, 0x111111], 40, 0.06); R.audio.splat(w); break;
       case 'pop': fx.confetti(c, 22, [this.o.color, 0xffffff]); R.audio.pop(w); break;
       case 'tv': this.b.screen.color.setScalar(0.02); fx.glassBurst(c, vel, 0x90a0a8, 16, 0.045); fx.sparks(c, [0xfff0a0, 0x80d0ff], 40, 7); R.audio.zap(w); R.audio.smash({ ...w, pitch: 0.8 }); break;
       case 'disco': fx.glassBurst(c, vel, [0xffffff, 0xcfe0ff, 0xffd0f0], 110, 0.07); fx.sparks(c, [0xffffff, 0xff2d95, 0x00e5ff], 70, 9); R.audio.smash({ ...w, size: 2 }); R.audio.ding({ f: 1760, ...w }); break;
@@ -276,6 +321,7 @@ class Target {
     for (const d of this.deps) if (d.state === 'alive') d.fall();
   }
   fall() {
+    if (this.T.kind === 'knock') { _v.set(rnd(-1, 1), 0, rnd(-1.5, 1.5)); this.hit({ vel: _v, point: this.c }); return; }
     this.state = 'fall'; this.fragile = true; this.life = 6;
     this.v.set(rnd(-0.5, 0.5), 0.8, rnd(-0.8, 0.8)); this.w.set(rnd(-5, 5), 0, rnd(-5, 5));
   }
@@ -299,6 +345,12 @@ class Target {
       this.center(); return;
     }
     // alive behaviours
+    if (o.skeet) {
+      this.v.y -= 6 * dt; g.position.addScaledVector(this.v, dt); g.rotation.y += 14 * dt; g.rotation.z = 0.25; this.center();
+      if (g.position.y < 0.1 || Math.abs(g.position.z) > 10.8) { this.state = 'gone'; g.visible = false; }
+      return;
+    }
+    if (this.b.fish) this.b.fish.rotation.y += dt * 1.6;
     if (o.conv !== undefined) { g.position.z = -8 + ((o.conv * 2 + t * 1.15) % 16); g.position.y = this.home.y + Math.abs(Math.sin(t * 3 + o.conv)) * 0.03; this.center(); }
     else if (this.type === 'balloon') { g.position.y = this.home.y + Math.sin(t * 0.8 + this.ph) * 0.14; g.position.z = this.home.z + Math.sin(t * 0.5 + this.ph * 2) * 0.1; this.center(); }
     else if (this.b.piv) {
@@ -356,14 +408,35 @@ export class Range {
     add('pan', 19, 4.3, -3.4, { L: 1.0, f: 196 }); add('pan', 19, 4.3, 2.8, { L: 1.3, f: 147 }); add('pan', 22.6, 4.9, -0.6, { L: 0.9, f: 262 });
     add('pinata', 22.6, 4.9, 5.4, { L: 1.0, ry: 0 });
 
-    // --- row B (x=24) ---
-    const cr = (x, y, z, s = 0.8) => sh(B(s, s, s, crate(), x, y, z, { stat: 1 }));
-    cr(24, 0.4, -7.6); add('tv', 24, 0.8, -7.6, {});
-    cr(24, 0.4, -5.4); cr(24, 1.2, -5.4); add('tv', 24, 1.6, -5.4, {});
-    [-2.6, -0.9, 0.8].forEach((z, i) => { sh(cyl(0.36, 0.33, 0.9 + i * 0.2, wood(), 24, 0.45 + i * 0.1, z)); W.statics.push(new THREE.Box3(new THREE.Vector3(23.65, 0, z - 0.35), new THREE.Vector3(24.35, 0.9 + i * 0.2, z + 0.35))); add('melon', 24, 0.9 + i * 0.2, z, { s: 1.15 }); });
-    sh(B(1.2, 0.16, 1.2, crate(), 24, 0.08, 3.4)); add('toilet', 24, 0.16, 3.4, { s: 1.15 });
-    cr(24, 0.4, 6.2, 0.8); cr(24, 0.4, 7.0, 0.8); add('teddy', 24, 0.8, 6.0, { s: 1.4 }); add('gnome', 24, 0.8, 6.9, { s: 1.5 }); add('vase', 24, 0.8, 7.4, { color: 0xd61f2c });
-    cr(24, 0.4, 9.2); add('tv', 24, 0.8, 9.2, {});
+    // --- row B (x=24): on a riser so it clears the duck board ---
+    const RB = 1.1;
+    sh(B(1.9, RB, 20.8, M(C.cConc, 1, 6, { rough: 0.8, color: 0x80858c }), 24, RB / 2, 0, { stat: 1 }));
+    const cr = (x, y, z, s = 0.8) => sh(B(s, s, s, crate(), x, y + RB, z, { stat: 1 }));
+    add('cake', 24, RB, -9.5, { s: 1.4 });
+    cr(24, 0.4, -7.6); add('tv', 24, RB + 0.8, -7.6, {});
+    cr(24, 0.4, -5.4); cr(24, 1.2, -5.4); add('tv', 24, RB + 1.6, -5.4, {});
+    [-2.6, -0.9, 0.8].forEach((z, i) => { const h = 0.5 + i * 0.2; sh(cyl(0.36, 0.33, h, wood(), 24, RB + h / 2, z)); W.statics.push(new THREE.Box3(new THREE.Vector3(23.65, 0, z - 0.35), new THREE.Vector3(24.35, RB + h, z + 0.35))); add('melon', 24, RB + h, z, { s: 1.15 }); });
+    add('toilet', 24, RB, 3.4, { s: 1.15 });
+    add('flamingo', 24, RB, 4.6, { s: 1.25 }); add('flamingo', 24, RB, 5.2, { s: 1.0 });
+    cr(24, 0.4, 6.2); cr(24, 0.4, 7.0); add('teddy', 24, RB + 0.8, 6.0, { s: 1.4 }); add('gnome', 24, RB + 0.8, 6.9, { s: 1.5 }); add('vase', 24, RB + 0.8, 7.4, { color: 0xd61f2c });
+    cr(24, 0.4, 9.2); add('tv', 24, RB + 0.8, 9.2, {});
+
+    // --- between the row A tables: a can stack, a fishbowl and lava lamps ---
+    sh(cyl(0.4, 0.36, 0.9, wood(), 17, 0.45, -3)); W.statics.push(new THREE.Box3(new THREE.Vector3(16.6, 0, -3.4), new THREE.Vector3(17.4, 0.9, -2.6)));
+    {
+      const o = i => ({ landY: 0.9, color: [0xd61f2c, 0x1e7fd6, 0xffd400][i % 3] }), dz = 0.14, dy = 0.175;
+      const a = [-1, 0, 1].map(i => add('can', 17, 0.9, -3 + i * dz, o(i + 1)));
+      const b = [-0.5, 0.5].map((i, k) => add('can', 17, 0.9 + dy, -3 + i * dz, o(k)));
+      const c = add('can', 17, 0.9 + 2 * dy, -3, o(2));
+      a[0].deps.push(b[0]); a[1].deps.push(b[0], b[1]); a[2].deps.push(b[1]); b[0].deps.push(c); b[1].deps.push(c);
+    }
+    sh(B(0.7, 0.9, 1.7, wood(), 17, 0.45, 3, { stat: 1 }));
+    add('fishbowl', 17, 0.9, 3, { color: 0x9fd8ff, s: 1.2 }); add('lava', 17, 0.9, 2.4, { color: 0xff2d95, s: 1.2 }); add('lava', 17, 0.9, 3.6, { color: 0x39ff88, s: 1.2 });
+    add('duck', 20.6, 1.48, 0, { conv: 0.5, ry: 0, s: 1.25, gold: true, pts: 300, label: 'GOLDEN DUCK' });
+
+    // --- skeet: clay pigeons get flung across the range while you're at the counter ---
+    [-1, 1].forEach(sd => sh(B(0.7, 0.6, 0.5, flat(0x2a2f33, { r: 0.5, m: 0.5 }), 18.8, 0.3, 10.5 * sd)));
+    this.plates = [0, 1, 2].map(() => add('plate', 18.8, -5, 0, { skeet: true, ry: 0 })); this.skeetT = 10; this.active = false;
 
     // --- balloons and the disco ball ---
     const bc = [0xff2d95, 0xffe600, 0x00c2ff, 0x7cff3a, 0xff7a00, 0xb26bff, 0xff2d2d, 0x00e5c0, 0xffffff];
@@ -393,6 +466,15 @@ export class Range {
     this.peds.forEach((p, i) => { p.visible = true; if (i % 2 === 0) this.W.statics.push(new THREE.Box3().setFromObject(p)); });
     this.finale.forEach(t => t.reset());
   }
+  pull() {
+    const side = Math.random() < 0.5 ? -1 : 1, n = Math.random() < 0.35 ? 2 : 1; let k = 0;
+    for (const p of this.plates) {
+      if (p.state !== 'gone' || k >= n) continue;
+      p.reset(); p.pop = 1; p.g.scale.setScalar(p.s);
+      p.g.position.set(18.8 + k * 1.6, 0.9, -10.2 * side); p.v.set(1 + Math.random() * 3, 9 + Math.random() * 1.5, side * (6.5 + Math.random() * 2)); p.center(); k++;
+    }
+    if (k) { this.audio.pull(); this.fx.popup(this.plates[0].c, 'PULL!', k > 1 ? 'DOUBLE' : '', 'call'); }
+  }
   near(point, r, except) {
     return this.targets.filter(t => t !== except && t.state === 'alive' && t.c.distanceTo(point) < r + t.r);
   }
@@ -421,6 +503,7 @@ export class Range {
   }
   update(dt, t) {
     for (const x of this.targets) x.update(dt, t);
+    if (this.active) { this.skeetT -= dt; if (this.skeetT <= 0) { this.skeetT = 12 + Math.random() * 9; this.pull(); } }
     this.tvT -= dt;
     if (this.tvT <= 0) {
       this.tvT = 0.07; const g = this.tvg;

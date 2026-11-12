@@ -128,12 +128,12 @@ function advDlg(cancel) {
 const story = new Story({
   say, toast, queue: lines => sayQ.push(...lines),
   lastCall() {
-    audio.bell(); toast('LAST CALL'); range.startFinale();
+    audio.bell(); toast('LAST CALL'); range.startFinale(); headline("LAST CALL: LANDLORD'S 'COLLECTION' ARRIVES AT RANGE");
     pem.group.visible = true; W.colliders.push({ x0: 10.9, x1: 11.5, z0: 8.2, z1: 8.8 });
     sayQ.push(['sal', "LAST CALL! Jar's full, Pemberton! But, uh... the range is still open."], ['pem', 'I had my collection brought in for the lobby. Nobody TOUCH anything.'], ['doug', "They're on the red pedestals. Just saying."]);
   },
   saved() {
-    G.score += 5000; hudNumbers(); partyT = 6;
+    G.score += 5000; hudNumbers(); partyT = 6; headline("BAR SAVED. LANDLORD 'MOVING INTO PARKING LOTS'");
     setTimeout(() => { toast('THE BAR IS SAVED'); audio.cheer(1); audio.bell(); }, 900);
     setTimeout(receipt, 9000);
     setTimeout(() => { // Pemberton stays, and takes a stool
@@ -167,6 +167,50 @@ for (const id in W.npc) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTex, depthWrite: false })); s.material.color.setScalar(2);
   s.scale.setScalar(0.3); W.npc[id].group.add(s); marks[id] = s;
 }
+
+// the jar on the bar actually fills with coins
+const jarCoins = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.095, 1, 20).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xd9a520, metalness: 1, roughness: 0.3, envMapIntensity: 2 }));
+{
+  const g = new THREE.Group(); g.position.set(2.2, 1.092, -5.3); scene.add(g);
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.105, 0.3, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0xdfefff, transparent: true, opacity: 0.28, roughness: 0.05, envMapIntensity: 2, side: THREE.DoubleSide, depthWrite: false }));
+  glass.position.y = 0.15; jarCoins.scale.y = 0.01; g.add(jarCoins, glass);
+}
+
+// a TV in the corner of the bar that reports on you, live
+const news = ['TONIGHT: GLASS. 100% CHANCE', "LANDLORD VOWS CONDOS 'BY BREAKFAST'", 'LOCAL DUCKS ON EDGE'];
+function headline(t) { if (news[0] !== t) { news.unshift(t); news.length = Math.min(news.length, 5); } }
+const tvC = document.createElement('canvas'); tvC.width = 512; tvC.height = 144; const tvG = tvC.getContext('2d');
+const tvTex = new THREE.CanvasTexture(tvC); tvTex.colorSpace = THREE.SRGBColorSpace;
+{
+  const m = new THREE.MeshBasicMaterial({ map: tvTex }); m.color.setScalar(1.25);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.48), m); p.position.set(6.35, 2.75, -7.96); scene.add(p);
+  W.B(1.84, 0.62, 0.1, W.flat(0x111111, { r: 0.4 }), 6.35, 2.75, -8.02);
+}
+let tvT = 0, tvX = 0;
+function updateNews(dt) {
+  tvT -= dt; tvX += dt * 120; if (tvT > 0) return; tvT = 0.07;
+  const g = tvG, line = news.join('   ●   ') + '   ●   ';
+  g.fillStyle = '#0a1830'; g.fillRect(0, 0, 512, 144);
+  g.fillStyle = '#c0181f'; g.fillRect(0, 0, 512, 54); g.fillStyle = '#fff'; g.font = '44px "Bebas Neue"'; g.textBaseline = 'middle';
+  g.fillText('SMASH NEWS LIVE', 14, 30); g.fillText(story.clock(), 370, 30);
+  g.font = '54px "Bebas Neue"'; g.fillStyle = '#ffe98a';
+  const w = g.measureText(line).width, x = -(tvX % w);
+  g.fillText(line, x, 102); g.fillText(line, x + w, 102);
+  tvTex.needsUpdate = true;
+}
+
+// regulars can get up and walk somewhere
+const movers = [];
+function walkTo(f, path, faceY) { f.pose = 'walk'; movers.push({ f, path, faceY }); }
+function updateMovers(dt) {
+  for (let i = movers.length - 1; i >= 0; i--) {
+    const m = movers[i], g = m.f.group, t = m.path[0], dx = t[0] - g.position.x, dz = t[1] - g.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.1) { m.path.shift(); if (!m.path.length) { m.f.pose = 'chat'; g.rotation.y = m.faceY; movers.splice(i, 1); } continue; }
+    g.position.x += dx / d * 1.3 * dt; g.position.z += dz / d * 1.3 * dt; g.rotation.y = Math.atan2(dx, dz);
+  }
+}
+let gpMoved = false, restockT = 0;
+const gpWatching = () => gpMoved && story.q.gp.state !== 'new';
 
 // Doug sweeps the range. Aim away from Doug.
 const doug = new NeonFigure({ color: 0xff7a2a, pose: 'chat', hat: 'cap', phase: 1 });
@@ -314,7 +358,17 @@ function interact() {
     if (bladder < 0.25) return say('', "Nothing to report. You just stand there, companionably.", 3);
     peeT = 2.2 + bladder * 2; audio.stream(peeT); return;
   }
-  if (talkTo) return startDlg(story.talk(talkTo));
+  if (talkTo) {
+    const who = talkTo;
+    return startDlg(story.talk(who), () => {
+      if ((who === 'gus' || who === 'pearl') && !gpMoved) { // they come and watch
+        gpMoved = true;
+        walkTo(W.npc.gus, [[2.9, 2.4], [7, 2.4], [10, 3.4], [11.5, 4.2]], Math.PI / 2);
+        walkTo(W.npc.pearl, [[4.4, 2.6], [7.5, 3], [10, 4.4], [11.5, 5.4]], Math.PI / 2);
+        sayQ.push(['pearl', "Come on, Gus. I want to watch my money get made."]);
+      }
+    });
+  }
   if (nearJuke()) {
     const s = audio.nextSong(); toast(s.name.toUpperCase()); audio.tick(700);
     sayQ.push(['lime', s.tempo > 1.2 ? 'YES. The ducks hate this one. Watch them run.' : s.tempo < 0.8 ? 'Ohh, a slow one. Even the ducks are swaying.' : 'Classic. Never skip the house shuffle.']);
@@ -332,6 +386,11 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyE') interact();
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (e.code === 'KeyG') altDown = true;
+  if (e.code === 'KeyQ' && tray.length > 1 && mode === 'idle') { tray.push(tray.shift()); equip(); drawTray(); audio.tick(760); }
+  if (e.code === 'KeyR' && inRange()) {
+    if (time < restockT) say('doug', "Bell's cooling down. I'm one man.");
+    else { const n = range.restock(); restockT = time + 30; audio.bell(); dougTalk = 0; say('doug', n ? 'Fresh stock! ' + n + ' new things to ruin!' : "Nothing's broken. Ring it when you've earned it."); }
+  }
   if (menuOpen && /^Digit\d$/.test(e.code)) { const d = DRINKS.find(x => x.key === e.code.slice(5)); if (d) order(d.id); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyG') altDown = false; if (e.code === 'KeyF' || e.code === 'Space') actionDown = false; });
@@ -370,7 +429,11 @@ function smashShot(s, point, target) {
   audio.smash({ ...range.where(point), size: 0.8, pitch: 1.15 });
   U.uHit.value = 1;
   if (target && story.has('shrapnel')) { curShot = s; for (const t of range.near(point, 0.75, target)) t.hit({ vel: s.vel, point: t.c }); curShot = null; }
-  if (!s.hit) { if (G.streak >= 3) toast('STREAK LOST'); G.streak = 0; hudNumbers(); dougSay('miss', 0.45); }
+  if (!s.hit) {
+    if (G.streak >= 3) toast('STREAK LOST'); G.streak = 0; hudNumbers();
+    if (gpWatching() && story.q.gp.state === 'active' && !dlg && Math.random() < 0.6) { dougTalk = time + 4; say('gus', pick(['Ha!', 'Told you.', 'Twenty bucks, Pearl.', 'The floor felt that one.'])); }
+    else dougSay('miss', 0.45);
+  }
 }
 
 function updateShots(dt) {
@@ -382,7 +445,7 @@ function updateShots(dt) {
       s.vel.y -= 9.8 * h; s.pos.addScaledVector(s.vel, h);
       const p = s.pos;
       if (Math.hypot(p.x - dg.x, p.z - dg.z) < 0.4 && p.y < 1.9) { // rule three
-        s.hit = true; G.doug++; smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
+        s.hit = true; G.doug++; headline('DOUG STRUCK. AGAIN. RULE THREE IGNORED'); smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
         fx.popup(p, '-250', 'RULE THREE', 'bad'); dougTalk = 0; dougSay('ow'); audio.thud(range.where(p)); break;
       }
       const hit = range.sweep(_a, p, 0.1);
@@ -412,6 +475,7 @@ function updateShots(dt) {
 
 range.onScore = (pts, label, pos, t, killed) => {
   const s = curShot;
+  if (s && !s.hit && gpWatching() && !dlg && story.q.gp.state === 'active') say('pearl', pick(["That's " + (G.streak + 1) + '!', 'Keep going, hon!', 'Hear that, Gus? That is the sound of my money.']), 2.2);
   if (s && !s.hit) { s.hit = true; G.hits++; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
   if (s && killed && ++s.kills > 1) { const b = s.kills === 2 ? 'DOUBLE!' : s.kills === 3 ? 'TRIPLE!' : 'CARNAGE!'; _c.copy(pos).y += 0.5; fx.popup(_c, b, 'one bottle', 'call'); pts += 60 * s.kills; }
   el.cross.classList.remove('hit'); void el.cross.offsetWidth; el.cross.classList.add('hit');
@@ -420,6 +484,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   G.score += n; if (killed) G.smashed++;
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
   U.uHit.value = 1.5;
+  if (killed) { const H = { tv: "GERALD'S TELEVISION DESTROYED. GERALD UNAVAILABLE FOR COMMENT", disco: 'DISCO BALL DEAD AT 17', duck: "DUCK DOWN. WITNESSES DESCRIBE 'A SQUEAK'", toilet: 'THE THRONE HAS FALLEN', fishbowl: 'FISH REPORTED FINE', gnome: 'GNOME COMMUNITY IN MOURNING', plate: 'CLAY PIGEON INTERCEPTED MID-AIR', piggy: 'PIGGY BANK MAKES LARGE WITHDRAWAL' }[t.type]; if (H) headline(H); }
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
@@ -546,7 +611,7 @@ function updateDrunk(dt) {
   el.hud.style.setProperty('--d', d.toFixed(3));
   if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); P.pitch += 0.035; fx.kick = 0.4; } }
   // too far: lights out, and you wake up back at the bar
-  if (D.level >= 9.6 && blackT <= 0) { blackT = 3.4; blackouts++; say('', 'The room folds up like a card table.', 2.5); }
+  if (D.level >= 9.6 && blackT <= 0) { blackT = 3.4; blackouts++; headline('PATRON NAPS ON COUNTER, MID-THROW'); say('', 'The room folds up like a card table.', 2.5); }
   if (blackT > 0) {
     const was = blackT; blackT -= dt;
     el.lids.style.setProperty('--lid', (blackT > 2.8 ? (3.4 - blackT) / 0.6 : blackT < 0.9 ? Math.max(0, blackT) / 0.9 : 1).toFixed(3));
@@ -580,6 +645,7 @@ function updateStory(dt) {
   if (!dlg && subT <= 0 && sayQ.length) { const [w, t] = sayQ.shift(); say(w, t, 3.8); }
   if (story.dirty) {
     story.dirty = false; el.quests.innerHTML = story.tracker(); el.clock.textContent = story.clock();
+    jarCoins.scale.y = 0.01 + 0.27 * story.jar / story.goal;
     el.jarFill.style.width = (story.jar / story.goal * 100) + '%'; el.jarNum.textContent = `$${Math.floor(story.jar).toLocaleString()} / $${story.goal.toLocaleString()}`;
     el.clock.classList.toggle('hot', story.phase !== 'night');
   }
@@ -619,7 +685,7 @@ function updateHints(dt) {
   else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
   else if (P.pos.z > 10.3) p = '<kbd>W A S D</kbd> walk in';
-  else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? 'out of ammo — back to the bar' : 'belly up to the bar';
+  else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? (range.broken > 0.45 && time > restockT ? 'out of ammo — <kbd>R</kbd> rings for fresh targets' : 'out of ammo — back to the bar') : 'belly up to the bar';
   setPrompt(p);
   if (menuOpen && !nearBar()) openMenu(false);
   if (!seenRange && inRange()) { seenRange = true; toast('THE SMASH RANGE'); say('', 'Finish a drink. Hurl the empty. Everything back there is fair game.', 5); }
@@ -641,6 +707,7 @@ function tick(dt) {
   time += dt;
   W.update(time, dt);
   if (started && !paused) {
+    updateNews(dt); updateMovers(dt);
     updatePlayer(dt); updateServe(dt); updateAction(dt); updateDoug(dt); updateShots(dt); updateDrunk(dt); updateStory(dt); updateHints(dt);
     audio.setMix(d01(), smooth(7, 11, P.pos.x), smooth(9.6, 11.5, P.pos.z));
   } else if (!started) {

@@ -488,6 +488,12 @@ export class Range {
     }
     if (k) { this.audio.pull(); this.fx.popup(this.plates[0].c, 'PULL!', k > 1 ? 'DOUBLE' : '', 'call'); }
   }
+  restock() {
+    let n = 0;
+    for (const t of this.targets) if ((t.state === 'dead' || t.state === 'husk') && !t.o.finale && !t.o.skeet) { t.reset(); n++; }
+    return n;
+  }
+  get broken() { let n = 0, k = 0; for (const t of this.targets) { if (t.o.finale || t.o.skeet) continue; k++; if (t.state !== 'alive') n++; } return n / k; }
   near(point, r, except) {
     return this.targets.filter(t => t !== except && t.state === 'alive' && t.c.distanceTo(point) < r + t.r);
   }

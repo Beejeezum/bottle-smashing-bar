@@ -71,7 +71,7 @@ const U = drunkPass.uniforms;
 // ---------- state ----------
 const P = { pos: new THREE.Vector3(0, 0, 14.6), vel: new THREE.Vector3(), yaw: 0, pitch: 0.06, bob: 0, lvx: 0, lvy: 0 };
 const D = { level: 0, pending: 0 };
-const G = { score: 0, smashed: 0, streak: 0, best: 0, tab: 0, thrown: 0, hits: 0, doug: 0 };
+const G = { score: 0, smashed: 0, streak: 0, best: 0, tab: 0, thrown: 0, hits: 0, doug: 0, wasted: 0 };
 const tray = [];            // drinks in hand, [0] is the one you're holding
 const shots = [];           // bottles in flight
 const keys = {};
@@ -151,14 +151,20 @@ const story = new Story({
     sayQ.push(['pem', "Enough! ENOUGH. Keep your wretched bar. I'm going into parking lots."], ['sal', "Bar's staying open, everybody! Next round's on the jar!"], ['', 'After hours now. Everything you break pays double.']);
   },
 });
-let partyT = 0;
+let partyT = 0, shareText = '';
 function receipt() {
   const acc = G.thrown ? Math.round(G.hits / G.thrown * 100) : 0, R = $('#receipt');
   const row = (a, b) => '<dt>' + a + '</dt><dd>' + b + '</dd>';
+  const badges = [];
+  if (G.doug === 0) badges.push('RULE THREE RESPECTED'); else if (G.doug >= 3) badges.push('MENACE TO DOUG');
+  if (acc >= 60 && G.thrown >= 10) badges.push('DEADEYE'); if (blackouts >= 2) badges.push('FREQUENT NAPPER');
+  if (G.best >= 8) badges.push('ON A HEATER'); if (pees === 0) badges.push('CAMEL'); if (G.wasted >= 3) badges.push('ALCOHOL ABUSER');
+  if (toasted.size >= 7) badges.push('EVERYBODY KNOWS YOUR NAME'); if (story.perks.size >= 6) badges.push('REGULAR');
+  shareText = 'My night at The Bottle Smashing Bar: ' + G.score.toLocaleString() + ' points, ' + G.smashed + ' things broken, ' + acc + '% accuracy, $' + G.tab + ' bar tab' + (badges.length ? '. ' + badges.join(', ') + '.' : '.') + ' https://beejeezum.github.io/bottle-smashing-bar/';
   R.innerHTML = '<h3>THE BOTTLE SMASHING BAR</h3><p>— tonight\'s damage —</p><dl>'
     + row('Bar tab', '$' + G.tab) + row('Things broken', G.smashed) + row('Bottles thrown', G.thrown) + row('Accuracy', acc + '%')
     + row('Best streak', G.best) + row('Blackouts', blackouts) + row('Restroom trips', pees) + row('Doug incidents', G.doug)
-    + '</dl><b>SCORE ' + G.score.toLocaleString() + '</b><p class="paid">PAID IN FULL · by the jar</p><small>press E to crumple</small>';
+    + '</dl>' + badges.map(b => '<span class="badge">' + b + '</span>').join('') + '<b>SCORE ' + G.score.toLocaleString() + '</b><p class="paid">PAID IN FULL · by the jar</p><small>press P to copy your night · E to crumple</small>';
   R.classList.add('on');
 }
 
@@ -488,7 +494,12 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (e.code === 'KeyG') altDown = true;
   if (e.code === 'KeyH') $('#help').classList.toggle('on');
+  if (e.code === 'KeyP' && shareText && $('#receipt').classList.contains('on')) { navigator.clipboard?.writeText(shareText).then(() => toast('COPIED'), () => { }); }
+  if (e.code === 'KeyN' && story.phase === 'saved') receipt();
   if (e.code === 'KeyC') cheers();
+  if (e.code === 'KeyV' && inRange() && tray[0] && tray[0].fill > 0 && mode === 'idle' && !dlg) { // waste a full one
+    charge = 0.6; lob = false; G.wasted++; throwIt(); dougTalk = 0; dougSay('waste');
+  }
   if (e.code === 'KeyB' && inRange() && frenzyT <= 0 && story.phase !== 'lastcall') {
     if (time < frenzyCool) say('doug', 'Give me a second to restack.');
     else { frenzyT = 60; frenzyScore = 0; range.restock(); audio.bell(); toast("DOUG'S SIXTY"); dougTalk = time + 6; say('doug', 'Sixty seconds. The crate of empties is on me. GO.', 3); }
@@ -534,7 +545,7 @@ function throwIt() {
   throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1) * (perfect ? 0.2 : 1));
   m.position.copy(_o); m.scale.setScalar(1.5); scene.add(m);
   const sp = throwSpeed(charge) * (1 + (Math.random() - 0.5) * 0.25 * d);
-  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, lob, life: 6, color: h.drink.glass ?? 0xdfefff });
+  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, lob, wet: h.fill > 0 ? h.drink.liquid : 0, life: 6, color: h.drink.glass ?? 0xdfefff });
   if (perfect) { _c.copy(_o).addScaledVector(_dir, 2.5); fx.popup(_c, 'PERFECT', 'release', 'call'); audio.tick(1500); }
   G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0; fx.kick = 0.35;
   if (IN.on && IN.watch) violation();
@@ -544,6 +555,7 @@ function throwIt() {
 function smashShot(s, point, target) {
   scene.remove(s.mesh); s.dead = true;
   fx.glassBurst(point, s.vel, s.color, 22, 0.045);
+  if (s.wet) { _c.set(0, 0, 0); for (let i = 0; i < 3; i++) fx.burst(fx.glowP, point, s.vel, s.wet, 14, 0.03, 4, 1.1); audio.splat({ ...range.where(point), vol: 0.5 }); }
   audio.smash({ ...range.where(point), size: 0.8, pitch: 1.15 });
   U.uHit.value = 1;
   if (target && story.has('shrapnel')) { curShot = s; for (const t of range.near(point, 0.75, target)) t.hit({ vel: s.vel, point: t.c }); curShot = null; }
@@ -597,6 +609,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   if (s && !s.hit) { s.hit = true; G.hits++; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
   if (s && killed && ++s.kills > 1) { const b = s.kills === 2 ? 'DOUBLE!' : s.kills === 3 ? 'TRIPLE!' : 'CARNAGE!'; _c.copy(pos).y += 0.5; fx.popup(_c, b, 'one bottle', 'call'); pts += 60 * s.kills; }
   if (s && s.perfect) pts *= 1.25;
+  if (s && s.wet) { pts *= 0.6; label += ' · WASTEFUL'; }
   el.cross.classList.remove('hit'); void el.cross.offsetWidth; el.cross.classList.add('hit');
   const mult = (happyT > 0 ? 2 : 1) * (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
   const n = Math.max(5, Math.round(pts * mult / 5) * 5);
@@ -816,7 +829,7 @@ function updateHints(dt) {
   else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>` + (h && h.fill > 0 ? ' · <kbd>C</kbd> cheers' : '');
   else if (nearJuke() && !talkTo) p = '<kbd>E</kbd> change the song';
   else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order · <kbd>T</kbd> tip Sal' + (nearSnacks() ? ' · <kbd>X</kbd> pretzels' : '');
-  else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
+  else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink' + (inRange() ? ' · <kbd>V</kbd> throw it full, you animal' : '');
   else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
   else if (P.pos.z > 10.6 && story.phase === 'saved' && story.night === 1) p = '<kbd>E</kbd> call it a night';

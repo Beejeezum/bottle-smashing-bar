@@ -186,5 +186,6 @@ export const DOUG = {
   miss: ["Wall's undefeated.", 'Floor: one. You: nothing.', "I'll sweep that. I sweep everything.", "Close! No it wasn't.", 'The targets are the colourful things.', 'Bold. Wrong, but bold.'],
   big: ["Now THAT'S a mess. Beautiful.", 'I felt that in my broom.', 'Oh, that one had family.'],
   ow: ['OW. Rule three! RULE THREE!', "I'm a person, not a target! Mostly!", "That's coming out of your score."],
+  waste: ['That was a FULL one. Savage.', 'Sal poured that. With love. Probably.', 'Alcohol abuse. Writing you up.'],
   sweep: ["Coming through. Hold your fire. Or don't. Nobody listens."],
 };

@@ -146,3 +146,5 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #fresh { margin-top: 14px; font: inherit; font-size: 16px; color: #fff; opacity: .6; background: none; border: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
 #fresh:hover { opacity: 1; }
 #settings { flex-wrap: wrap; justify-content: center; }
+
+#receipt .badge { display: inline-block; font-size: 10px; font-weight: bold; border: 1px solid #1a1512; border-radius: 3px; padding: 1px 5px; margin: 0 2px 5px; }

@@ -97,7 +97,7 @@ export class FX {
       this.glowP.spawn(pos, _v.x, _v.y + 2, _v.z, _c, 0.05, 0.008, 0.07, rnd(1.5, 3.5));
     }
   }
-  trail(pos, color) { _c.set(color).multiplyScalar(1.3); this.glowP.spawn(pos, 0, 0.3, 0, _c, 0.03, 0.03, 0.03, 0.28); }
+  trail(pos, color) { _c.set(color).multiplyScalar(0.55); this.glowP.spawn(pos, 0, 0.3, 0, _c, 0.018, 0.018, 0.018, 0.22); }
   popup(pos, text, label = '', cls = '') {
     const el = document.createElement('div');
     el.className = 'pop ' + cls;

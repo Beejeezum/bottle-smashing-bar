@@ -84,6 +84,7 @@ let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
 const nearJuke = () => Math.hypot(P.pos.x + 6.9, P.pos.z + 1.5) < 1.5;
 const nearToilet = () => Math.hypot(P.pos.x - W.restroom.toilet.x, P.pos.z - W.restroom.toilet.z) < 1.1;
 const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
+if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('#best').textContent = 'this one needs a keyboard and mouse';
 const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your best night: ${best0.toLocaleString()}`;
 const d01 = () => clamp(D.level / 9, 0, 1);
 
@@ -415,11 +416,13 @@ const throwSpeed = c => lob ? 6.5 + 8.5 * c : 9 + 16 * c;
 function throwIt() {
   const h = tray.shift(); const d = d01();
   const m = h.mesh; hand.remove(m); grip.visible = false;
-  throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1));
+  const perfect = charge >= 0.8 && charge <= 0.95; // let go in the sweet spot and the bottle flies true
+  throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1) * (perfect ? 0.2 : 1));
   m.position.copy(_o); m.scale.setScalar(1.5); scene.add(m);
   const sp = throwSpeed(charge) * (1 + (Math.random() - 0.5) * 0.25 * d);
-  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, life: 6, color: h.drink.glass ?? 0xdfefff });
-  G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0;
+  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, life: 6, color: h.drink.glass ?? 0xdfefff });
+  if (perfect) { _c.copy(_o).addScaledVector(_dir, 2.5); fx.popup(_c, 'PERFECT', 'release', 'call'); audio.tick(1500); }
+  G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0; fx.kick = 0.35;
   setTimeout(() => { equip(); drawTray(); }, 280); drawTray();
 }
 
@@ -465,7 +468,7 @@ function updateShots(dt) {
       if (wall) { p.y = Math.max(p.y, 0.05); smashShot(s, p); }
     }
     if (!s.dead) {
-      s.mesh.position.copy(s.pos); fx.trail(s.pos, s.color);
+      s.mesh.position.copy(s.pos); if (s.life < 5.8) fx.trail(s.pos, s.color);
       s.mesh.rotation.x += s.spin.x * dt; s.mesh.rotation.y += s.spin.y * dt; s.mesh.rotation.z += s.spin.z * dt;
       s.life -= dt; if (s.life <= 0) { scene.remove(s.mesh); s.dead = true; }
     }
@@ -478,13 +481,14 @@ range.onScore = (pts, label, pos, t, killed) => {
   if (s && !s.hit && gpWatching() && !dlg && story.q.gp.state === 'active') say('pearl', pick(["That's " + (G.streak + 1) + '!', 'Keep going, hon!', 'Hear that, Gus? That is the sound of my money.']), 2.2);
   if (s && !s.hit) { s.hit = true; G.hits++; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
   if (s && killed && ++s.kills > 1) { const b = s.kills === 2 ? 'DOUBLE!' : s.kills === 3 ? 'TRIPLE!' : 'CARNAGE!'; _c.copy(pos).y += 0.5; fx.popup(_c, b, 'one bottle', 'call'); pts += 60 * s.kills; }
+  if (s && s.perfect) pts *= 1.25;
   el.cross.classList.remove('hit'); void el.cross.offsetWidth; el.cross.classList.add('hit');
   const mult = (happyT > 0 ? 2 : 1) * (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
   const n = Math.max(5, Math.round(pts * mult / 5) * 5);
   G.score += n; if (killed) G.smashed++;
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
   U.uHit.value = 1.5;
-  if (killed) { const H = { tv: "GERALD'S TELEVISION DESTROYED. GERALD UNAVAILABLE FOR COMMENT", disco: 'DISCO BALL DEAD AT 17', duck: "DUCK DOWN. WITNESSES DESCRIBE 'A SQUEAK'", toilet: 'THE THRONE HAS FALLEN', fishbowl: 'FISH REPORTED FINE', gnome: 'GNOME COMMUNITY IN MOURNING', plate: 'CLAY PIGEON INTERCEPTED MID-AIR', piggy: 'PIGGY BANK MAKES LARGE WITHDRAWAL' }[t.type]; if (H) headline(H); }
+  if (killed) { const H = { tv: "GERALD'S TELEVISION DESTROYED. GERALD UNAVAILABLE FOR COMMENT", chandelier: 'CHANDELIER DOWN. REPEAT: CHANDELIER DOWN', disco: 'DISCO BALL DEAD AT 17', duck: "DUCK DOWN. WITNESSES DESCRIBE 'A SQUEAK'", toilet: 'THE THRONE HAS FALLEN', fishbowl: 'FISH REPORTED FINE', gnome: 'GNOME COMMUNITY IN MOURNING', plate: 'CLAY PIGEON INTERCEPTED MID-AIR', piggy: 'PIGGY BANK MAKES LARGE WITHDRAWAL' }[t.type]; if (H) headline(H); }
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
@@ -598,6 +602,7 @@ function updateAction(dt) {
   }
   el.charge.style.strokeDashoffset = 100.5 * (1 - (mode === 'charge' ? charge : 0));
   el.cross.classList.toggle('hot', mode === 'charge');
+  el.cross.classList.toggle('sweet', mode === 'charge' && charge >= 0.8 && charge <= 0.95);
 }
 
 function updateDrunk(dt) {

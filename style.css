@@ -127,3 +127,5 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 
 #cross.hit circle:first-child { animation: hitmark .25s ease-out; }
 @keyframes hitmark { 0% { r: 9; fill: #fff; } 100% { r: 2; } }
+
+#cross.sweet #charge { stroke: var(--lime); filter: drop-shadow(0 0 6px var(--lime)); stroke-width: 4.5; }

@@ -164,6 +164,23 @@ const BUILD = {
     P(g, CYL, S(0xff6a1a, 0.5), 0, 0, 0, .2, .03, .2); P(g, CYL, S(0x222222, 0.5), 0, .01, 0, .12, .03, .12);
     return { g, r: 0.3, cy: 0 };
   },
+  chandelier(o) {
+    const g = new THREE.Group(), piv = new THREE.Group(); g.add(piv);
+    P(piv, CYL, BLACK, 0, -o.L / 2, 0, .015, o.L, .015);
+    const body = new THREE.Group(); body.position.y = -o.L - 0.3; piv.add(body);
+    const ring = (r, y) => { const m = P(body, new THREE.TorusGeometry(r, .035, 8, 32), GOLD, 0, y, 0); m.rotation.x = Math.PI / 2; };
+    ring(.7, 0); ring(.42, .28); P(body, CYL, GOLD, 0, .3, 0, .03, .6, .03);
+    const bulb = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd9a0).multiplyScalar(2.2) });
+    const cry = new THREE.MeshStandardMaterial({ color: 0xf4faff, transparent: true, opacity: 0.7, roughness: 0.03, envMapIntensity: 4, flatShading: true });
+    const gem = new THREE.IcosahedronGeometry(1, 0);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4, x = Math.cos(a) * .7, z = Math.sin(a) * .7;
+      P(body, SPH, bulb, x, .1, z, .05).castShadow = false; P(body, CYL, GOLD, x, .04, z, .02, .08, .02);
+      P(body, gem, cry, x, -.18, z, .06, .11, .06); P(body, gem, cry, x * .6, -.3, z * .6, .05, .09, .05);
+    }
+    P(body, gem, cry, 0, -.3, 0, .17, .26, .17);
+    return { g, r: 0.85, cy: 0, piv, center: body, L: o.L + 0.3 };
+  },
   popup() {
     const g = new THREE.Group(), card = S(0xb89a70, 0.9);
     P(g, BOX, card, 0, .4, 0, .5, .72, .03); P(g, BOX, card, 0, -.3, 0, .05, .8, .03);
@@ -237,6 +254,7 @@ const TYPES = {
   cake: { kind: 'splat', pts: 140, label: 'CAKE', debris: [0xfff6ea, 0xff9ac0, 0xfff6ea, 0xd61f2c] },
   flamingo: { kind: 'knock', pts: 90, label: 'FLAMINGO', snd: 'thud' },
   plate: { kind: 'ceramic', pts: 350, label: 'CLAY PIGEON', debris: [0xff6a1a, 0x222222] },
+  chandelier: { kind: 'chand', pts: 1500, label: 'THE CHANDELIER', hp: 4, swing: true, respawn: 75 },
   popup: { kind: 'ceramic', pts: 250, label: 'POP-UP PEMBERTON', debris: [0xb89a70, 0x8a6a40, 0xe6c2a0], respawn: 4 },
   trophy: { kind: 'ceramic', pts: 1000, label: "PEMBERTON'S TROPHY", debris: [0xd9a520, 0xffe08a], coins: true },
   portrait: { kind: 'ceramic', pts: 1000, label: 'THE PORTRAIT', debris: [0xd9a520, 0x5a3a20, 0xe8d8c0] },
@@ -299,8 +317,8 @@ class Target {
     this.hp--;
     if (this.hp > 0) {
       if (T.swing) this.angV += 4;
-      R.fx.chunkBurst(p.point, p.vel, T.debris ?? [0xff2d95, 0xffe600], 8, 0.04);
-      R.audio.ceramic({ ...R.where(this.c), pitch: 0.7 }); R.score(this, Math.round(T.pts * 0.2), 'CRACKED');
+      if (T.kind === 'chand') { R.fx.glassBurst(p.point, p.vel, 0xfff0c8, 16, 0.05); R.audio.smash({ ...R.where(this.c), pitch: 1.4, size: 0.6 }); }
+      else { R.fx.chunkBurst(p.point, p.vel, T.debris ?? [0xff2d95, 0xffe600], 8, 0.04); R.audio.ceramic({ ...R.where(this.c), pitch: 0.7 }); } R.score(this, Math.round(T.pts * 0.2), 'CRACKED');
       return 'block';
     }
     this.destroy(p.vel, 1);
@@ -322,6 +340,12 @@ class Target {
       case 'pop': fx.confetti(c, 22, [this.o.color, 0xffffff]); R.audio.pop(w); break;
       case 'tv': this.b.screen.color.setScalar(0.02); fx.glassBurst(c, vel, 0x90a0a8, 16, 0.045); fx.sparks(c, [0xfff0a0, 0x80d0ff], 40, 7); R.audio.zap(w); R.audio.smash({ ...w, pitch: 0.8 }); break;
       case 'disco': fx.glassBurst(c, vel, [0xffffff, 0xcfe0ff, 0xffd0f0], 110, 0.07); fx.sparks(c, [0xffffff, 0xff2d95, 0x00e5ff], 70, 9); R.audio.smash({ ...w, size: 2 }); R.audio.ding({ f: 1760, ...w }); break;
+      case 'chand': {
+        const cols = [0xffffff, 0xfff0c8, 0xd9a520], f = c.clone(); f.y = 0.3;
+        fx.glassBurst(c, vel, cols, 130, 0.08); fx.sparks(c, [0xffd9a0, 0xffffff], 80, 9); R.audio.smash({ ...w, size: 2 }); R.audio.gong({ f: 110, ...w });
+        setTimeout(() => { fx.glassBurst(f, vel, cols, 90, 0.07); fx.sparks(f, 0xffd9a0, 60, 8); R.audio.smash({ ...w, size: 2, pitch: 0.8 }); R.audio.thud(w); }, 450);
+        break;
+      }
       case 'pinata': fx.confetti(c, 110); fx.chunkBurst(c, vel, [0xff2d95, 0xffe600, 0x00c2ff, 0x7cff3a, 0xff7a00], 36, 0.045); R.audio.pop(w); R.audio.coins(w); break;
     }
     if (mult) R.score(this, T.pts * mult, label ?? T.label, true);
@@ -455,6 +479,7 @@ export class Range {
     const bc = [0xff2d95, 0xffe600, 0x00c2ff, 0x7cff3a, 0xff7a00, 0xb26bff, 0xff2d2d, 0x00e5c0, 0xffffff];
     bc.forEach((color, i) => add('balloon', 26.5 + (i % 3) * 1.1, 2.6 + ((i * 7) % 5) * 0.75, -8.5 + i * 2.1, { color }));
     add('disco', 28, 6.4, 0, {});
+    add('chandelier', 26, 9.4, -5.2, { L: 1.7, ry: 0 });
 
     // --- back row (x=31): shelf wall of plush and pottery ---
     [1.2, 2.05, 2.9].forEach(y => sh(B(0.55, 0.06, 6.4, wood(), 31, y, -5, { stat: 1 })));

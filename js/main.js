@@ -79,6 +79,7 @@ let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
 let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
 let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
+let nightFade = false;
 let happyT = 0, happyNext = 140, altDown = false, lob = false;
 let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
 const nearJuke = () => Math.hypot(P.pos.x + 6.9, P.pos.z + 1.5) < 1.5;
@@ -89,7 +90,7 @@ const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your b
 const d01 = () => clamp(D.level / 9, 0, 1);
 
 // ---------- HUD ----------
-const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross'), clock: $('#clock'), jarFill: $('#jar-fill'), jarNum: $('#jar-num'), quests: $('#quests'), lids: $('#lids'), bladder: $('#bladder'), bladderFill: $('#bladder i') };
+const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross'), clock: $('#clock'), jarFill: $('#jar-fill'), jarNum: $('#jar-num'), quests: $('#quests'), lids: $('#lids'), eye: $('#eye'), bladder: $('#bladder'), bladderFill: $('#bladder i') };
 let subT = 0, promptText = '', dlg = null;
 const sayQ = [];
 function say(who, text, dur = 3.2) {
@@ -132,6 +133,12 @@ const story = new Story({
     audio.bell(); toast('LAST CALL'); range.startFinale(); headline("LAST CALL: LANDLORD'S 'COLLECTION' ARRIVES AT RANGE");
     pem.group.visible = true; W.colliders.push({ x0: 10.9, x1: 11.5, z0: 8.2, z1: 8.8 });
     sayQ.push(['sal', "LAST CALL! Jar's full, Pemberton! But, uh... the range is still open."], ['pem', 'I had my collection brought in for the lobby. Nobody TOUCH anything.'], ['doug', "They're on the red pedestals. Just saying."]);
+  },
+  permit() {
+    IN.on = false; IN.watch = false; el.eye.className = ''; partyT = 6; G.score += 8000; hudNumbers(); headline('PERMIT GRANTED. INSPECTOR SEEN DOING A SHOT');
+    setTimeout(() => { toast('PERMIT GRANTED'); audio.cheer(1); audio.bell(); }, 700); setTimeout(receipt, 9000);
+    walkTo(insp, [[9.5, -5], [6.8, -3.6]], Math.PI);
+    sayQ.push(['insp', 'This is the best-run establishment I have ever fined. Permit granted.'], ['sal', "He's on his third lager. I think we're good."], ['', 'That is the story so far. The bar is yours. Break whatever you like.']);
   },
   saved() {
     G.score += 5000; hudNumbers(); partyT = 6; headline("BAR SAVED. LANDLORD 'MOVING INTO PARKING LOTS'");
@@ -212,6 +219,33 @@ function updateMovers(dt) {
 }
 let gpMoved = false, restockT = 0;
 const gpWatching = () => gpMoved && story.q.gp.state !== 'new';
+
+// night two: a health inspector reads the rules poster, and turns round without warning
+const insp = new NeonFigure({ color: 0xff5a4a, pose: 'chat', hat: 'cap', phase: 5, boost: 1.6 });
+insp.group.position.set(10.9, 0, -9.3); insp.group.rotation.y = Math.PI; insp.group.visible = false; scene.add(insp.group); W.figures.push(insp);
+const IN = { on: false, t: 8, watch: false, warn: false };
+function updateInspector(dt) {
+  if (!IN.on) return;
+  IN.t -= dt;
+  if (!IN.watch && !IN.warn && IN.t < 1.3) { IN.warn = true; audio.tick(300); }
+  if (IN.t <= 0) {
+    IN.watch = !IN.watch; IN.warn = false; IN.t = IN.watch ? 3 + Math.random() * 2.5 : 6 + Math.random() * 6;
+    if (IN.watch && inRange()) { dougTalk = time + 3; say('insp', pick(['Hm.', 'I heard glass.', 'What was that.', 'Nobody move.']), 2); }
+  }
+  insp.group.rotation.y += ((IN.watch ? 0.75 : Math.PI) - insp.group.rotation.y) * Math.min(1, dt * 7);
+  el.eye.className = IN.watch ? 'on red' : IN.warn ? 'on amber' : 'on';
+  el.eye.textContent = IN.watch ? 'INSPECTOR IS WATCHING · DO NOT THROW' : IN.warn ? 'he is turning round...' : 'inspector is reading the rules';
+}
+function violation() {
+  story.fine(150); toast('VIOLATION'); audio.tick(180); headline('INSPECTOR WITNESSES BOTTLE. BOTTLE WITNESSES INSPECTOR');
+  sayQ.push(['insp', pick(['VIOLATION. Projectile. Indoors. That is a fine.', 'I SAW that. Section four. One hundred and fifty dollars.', 'Airborne glassware. Writing it down. Underlining it.'])]);
+}
+function nightTwo() {
+  story.startNight2(); IN.on = true; IN.t = 10; IN.watch = false; insp.group.visible = true; W.colliders.push({ x0: 10.6, x1: 11.2, z0: -9.6, z1: -9.0 });
+  D.level = 0; D.pending = 0; bladder = 0; P.pos.set(0, 0, 14.2); P.yaw = 0; P.pitch = 0.08; $('#receipt').classList.remove('on');
+  toast('NIGHT TWO'); headline('HEALTH INSPECTOR VISITS RANGE; RANGE VISITS HEALTH INSPECTOR');
+  sayQ.push(['', 'The next evening. The sign is still buzzing.'], ['sal', "Bad news. Pemberton's cousin is a health inspector. He's in the range, reading the rules."], ['sal', "Jar needs $2,500 for the 'permit'. Throw all you like. Just not while he's LOOKING."]);
+}
 
 // Doug sweeps the range. Aim away from Doug.
 const doug = new NeonFigure({ color: 0xff7a2a, pose: 'chat', hat: 'cap', phase: 1 });
@@ -355,6 +389,7 @@ function interact() {
   if ($('#receipt').classList.contains('on')) return $('#receipt').classList.remove('on');
   if (dlg) return advDlg();
   if (peeT > 0) return;
+  if (story.phase === 'saved' && story.night === 1 && P.pos.z > 10.6) { blackT = 3.4; nightFade = true; setTimeout(nightTwo, 1500); return; }
   if (W.restroom.inside(P.pos) && nearToilet()) {
     if (bladder < 0.25) return say('', "Nothing to report. You just stand there, companionably.", 3);
     peeT = 2.2 + bladder * 2; audio.stream(peeT); return;
@@ -423,6 +458,7 @@ function throwIt() {
   shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, life: 6, color: h.drink.glass ?? 0xdfefff });
   if (perfect) { _c.copy(_o).addScaledVector(_dir, 2.5); fx.popup(_c, 'PERFECT', 'release', 'call'); audio.tick(1500); }
   G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0; fx.kick = 0.35;
+  if (IN.on && IN.watch) violation();
   setTimeout(() => { equip(); drawTray(); }, 280); drawTray();
 }
 
@@ -616,11 +652,12 @@ function updateDrunk(dt) {
   el.hud.style.setProperty('--d', d.toFixed(3));
   if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); P.pitch += 0.035; fx.kick = 0.4; } }
   // too far: lights out, and you wake up back at the bar
-  if (D.level >= 9.6 && blackT <= 0) { blackT = 3.4; blackouts++; headline('PATRON NAPS ON COUNTER, MID-THROW'); say('', 'The room folds up like a card table.', 2.5); }
+  if (D.level >= 9.6 && blackT <= 0 && !nightFade) { blackT = 3.4; blackouts++; headline('PATRON NAPS ON COUNTER, MID-THROW'); say('', 'The room folds up like a card table.', 2.5); }
   if (blackT > 0) {
     const was = blackT; blackT -= dt;
     el.lids.style.setProperty('--lid', (blackT > 2.8 ? (3.4 - blackT) / 0.6 : blackT < 0.9 ? Math.max(0, blackT) / 0.9 : 1).toFixed(3));
-    if (was > 1.6 && blackT <= 1.6) {
+    if (blackT <= 0) nightFade = false;
+    if (was > 1.6 && blackT <= 1.6 && !nightFade) {
       P.pos.set(0.9, 0, -4.2); P.yaw = 0; P.pitch = 0; P.vel.set(0, 0, 0); D.level = 5.2; D.pending = 0; mode = 'idle'; charge = 0;
       sayQ.push(['sal', pick(["Morning, sunshine. It's been four minutes. Doug carried you back.", 'You fell asleep on the counter. Mid-throw. Impressive, honestly.', 'Welcome back. You missed nothing. You also hit nothing.'])]);
     }
@@ -689,6 +726,7 @@ function updateHints(dt) {
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
   else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
+  else if (P.pos.z > 10.6 && story.phase === 'saved' && story.night === 1) p = '<kbd>E</kbd> call it a night';
   else if (P.pos.z > 10.3) p = '<kbd>W A S D</kbd> walk in';
   else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? (range.broken > 0.45 && time > restockT ? 'out of ammo — <kbd>R</kbd> rings for fresh targets' : 'out of ammo — back to the bar') : 'belly up to the bar';
   setPrompt(p);
@@ -712,7 +750,7 @@ function tick(dt) {
   time += dt;
   W.update(time, dt);
   if (started && !paused) {
-    updateNews(dt); updateMovers(dt);
+    updateNews(dt); updateMovers(dt); updateInspector(dt);
     updatePlayer(dt); updateServe(dt); updateAction(dt); updateDoug(dt); updateShots(dt); updateDrunk(dt); updateStory(dt); updateHints(dt);
     audio.setMix(d01(), smooth(7, 11, P.pos.x), smooth(9.6, 11.5, P.pos.z));
   } else if (!started) {
@@ -727,5 +765,5 @@ $('#loading')?.remove(); $('#start').disabled = false;
 // handy for poking at the game from the console
 window.game = { P, D, G, tray, order, W, range, audio, shots, story, interact, DG, get mode() { return mode; }, get dlg() { return dlg; }, get talkTo() { return talkTo; },
   tp(x, z, yaw = P.yaw, pitch = P.pitch) { P.pos.set(x, 0, z); P.yaw = yaw; P.pitch = pitch; },
-  press(v) { actionDown = v; }, alt(v) { altDown = v; }, set happyNext(v) { happyNext = v; }, get bladder() { return bladder; }, set bladder(v) { bladder = v; },
+  press(v) { actionDown = v; }, IN, nightTwo, alt(v) { altDown = v; }, set happyNext(v) { happyNext = v; }, get bladder() { return bladder; }, set bladder(v) { bladder = v; },
   run(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); composer.render(); }, };

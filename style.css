@@ -129,3 +129,8 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 @keyframes hitmark { 0% { r: 9; fill: #fff; } 100% { r: 2; } }
 
 #cross.sweet #charge { stroke: var(--lime); filter: drop-shadow(0 0 6px var(--lime)); stroke-width: 4.5; }
+
+#eye { display: none; margin-top: 6px; font-size: 16px; padding: 2px 10px; border-radius: 99px; background: rgba(10,7,9,.5); color: #9fb; text-shadow: none; }
+#eye.on { display: inline-block; }
+#eye.amber { color: var(--amber); }
+#eye.red { color: #fff; background: #c0181f; animation: flick .5s infinite; box-shadow: 0 0 18px #f00; }

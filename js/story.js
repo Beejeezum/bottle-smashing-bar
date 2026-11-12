@@ -4,7 +4,7 @@ export const CAST = {
   sal: { name: 'SAL', color: '#fff0c4' }, tex: { name: 'TEX', color: '#ff2d95' }, dol: { name: 'DOLORES', color: '#00e5ff' },
   hank: { name: 'HANK', color: '#ffe600' }, riv: { name: 'RIVET', color: '#b26bff' }, lime: { name: 'LIME', color: '#9dff00' },
   gus: { name: 'GUS', color: '#ff8a00' }, pearl: { name: 'PEARL', color: '#ff5ad0' }, doug: { name: 'DOUG', color: '#ff7a2a' },
-  pem: { name: 'MR. PEMBERTON', color: '#c8ffd8' }, '': { name: '', color: '#fff' },
+  pem: { name: 'MR. PEMBERTON', color: '#c8ffd8' }, insp: { name: 'THE INSPECTOR', color: '#ff7a6a' }, '': { name: '', color: '#fff' },
 };
 
 export const PERKS = {
@@ -60,7 +60,7 @@ const PEM_CRY = { trophy: 'My club championship trophy!', portrait: 'That portra
 export class Story {
   constructor(api) {
     this.api = api; this.q = {}; QUESTS.forEach(d => this.q[d.id] = { d, state: 'new', n: 0 });
-    this.perks = new Set(); this.jar = 0; this.goal = 1500; this.phase = 'night'; this.met = new Set(); this.left = 5; this.dirty = true;
+    this.perks = new Set(); this.jar = 0; this.goal = 1500; this.phase = 'night'; this.met = new Set(); this.left = 5; this.dirty = true; this.night = 1; this.fines = 0;
   }
   has(p) { return this.perks.has(p); }
   quest(who) { return Object.values(this.q).find(q => q.d.who.includes(who)); }
@@ -115,9 +115,11 @@ export class Story {
   addJar(n, quiet) {
     if (this.phase !== 'night') return;
     this.jar = Math.min(this.goal, this.jar + n * (this.has('tips') && !quiet ? 1.5 : 1)); this.dirty = true;
-    if (this.jar >= this.goal) { this.phase = 'lastcall'; this.api.lastCall(); }
+    if (this.jar >= this.goal) { if (this.night === 2) { this.phase = 'saved'; this.api.permit(); } else { this.phase = 'lastcall'; this.api.lastCall(); } }
   }
 
+  startNight2() { this.night = 2; this.phase = 'night'; this.jar = 0; this.goal = 2500; this.dirty = true; }
+  fine(n) { this.fines++; this.jar = Math.max(0, this.jar - n); this.dirty = true; }
   clock() {
     if (this.phase === 'lastcall') return 'LAST CALL';
     if (this.phase === 'saved') return 'AFTER HOURS';
@@ -128,7 +130,9 @@ export class Story {
   tracker() {
     const out = [];
     if (this.phase === 'lastcall') out.push(`<li class="hot">Smash Pemberton's things <b>${5 - this.left}/5</b></li>`);
-    if (this.phase === 'saved') out.push('<li class="ok">The bar is saved. Everything pays double.</li>');
+    if (this.phase === 'saved') out.push(this.night === 2 ? '<li class="ok">Permit granted. The bar is bulletproof.</li>' : '<li class="ok">The bar is saved. Everything pays double.</li>');
+    if (this.phase === 'saved' && this.night === 1) out.push('<li>Step outside to call it a night</li>');
+    if (this.night === 2 && this.phase === 'night') out.push('<li class="hot">Fill the jar for the permit</li><li>Never throw while he watches <b>fines: ' + this.fines + '</b></li>');
     for (const q of Object.values(this.q)) {
       if (q.state === 'active') out.push(`<li>${q.d.title} <b>${Math.min(q.n, q.d.need)}/${q.d.need}</b></li>`);
       if (q.state === 'done') out.push(`<li class="ok">Tell ${CAST[q.d.who.at(-1)].name} it's done</li>`);

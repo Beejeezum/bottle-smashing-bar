@@ -176,6 +176,25 @@ for (const id in W.npc) {
   s.scale.setScalar(0.3); W.npc[id].group.add(s); marks[id] = s;
 }
 
+// a bowl of pretzels on the bar: eat some and the next few drinks land softer
+{
+  const g = new THREE.Group(); g.position.set(-1.7, 1.092, -5.08); scene.add(g);
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5a2d16, roughness: 0.5, side: THREE.DoubleSide }));
+  bowl.position.y = 0.12; g.add(bowl);
+  const pm = new THREE.MeshStandardMaterial({ color: 0xb8742a, roughness: 0.6 }), pg = new THREE.TorusGeometry(0.022, 0.006, 5, 10);
+  for (let i = 0; i < 14; i++) { const p = new THREE.Mesh(pg, pm); p.position.set(Math.sin(i * 2.4) * 0.07, 0.06 + (i % 4) * 0.012, Math.cos(i * 2.4) * 0.07); p.rotation.set(i, i * 2, i * 3); g.add(p); }
+}
+let linedT = 0, snackT = 0, tips = 0;
+const nearSnacks = () => Math.hypot(P.pos.x + 1.7, P.pos.z + 4.4) < 1.5;
+const TOASTS = { tex: 'To ducks.', dol: "To Gerald's misfortune.", hank: 'To the bottle, and its journey.', riv: 'TO NOISE.', lime: 'Woo! Cheers!', gus: 'To winning.', pearl: 'To Gus losing.', pem: '...To parking.', insp: 'I am on duty. ...Cheers.' };
+const toasted = new Set();
+function cheers() {
+  const h = tray[0];
+  if (!talkTo || !h || h.fill <= 0 || dlg) return;
+  audio.clink(); fx.kick = 0.3; W.npc[talkTo].toast = 1; say(talkTo, TOASTS[talkTo] ?? 'Cheers.', 2.5);
+  if (!toasted.has(talkTo)) { toasted.add(talkTo); story.addJar(25, true); if (toasted.size === 7) { toast('EVERYBODY KNOWS YOUR NAME'); story.addJar(100, true); } }
+}
+
 // the jar on the bar actually fills with coins
 const jarCoins = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.095, 1, 20).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xd9a520, metalness: 1, roughness: 0.3, envMapIntensity: 2 }));
 {
@@ -335,7 +354,7 @@ function updateServe(dt) {
   const b = W.bartender;
   if (!serving && serveQ.length) {
     const q = serveQ.shift(), m = makeVessel(q.d, 0);
-    m.position.set(clamp(b.group.position.x + 0.2 + ((served++ % 5) - 2) * 0.13, -7.4, 4), 1.092, -5.5); scene.add(m);
+    m.position.set(clamp((nearBar() ? P.pos.x : b.group.position.x) + 0.2 + ((served++ % 5) - 2) * 0.13, -7.4, 4), 1.092, -5.5); scene.add(m);
     serving = { d: q.d, m, t: 0, dur: q.fast ? 0.3 : 0.75 }; b.serveT = serving.dur + 0.1; if (!q.fast || served % 2) audio.pour();
   }
   if (serving) {
@@ -346,7 +365,7 @@ function updateServe(dt) {
   }
   for (let i = waiting.length - 1; i >= 0; i--) {
     const s = waiting[i];
-    if (Math.hypot(P.pos.x - s.m.position.x, P.pos.z - s.m.position.z) < 2.0 && tray.length < cap()) {
+    if (Math.hypot(P.pos.x - s.m.position.x, P.pos.z - s.m.position.z) < 2.3 && tray.length < cap()) {
       scene.remove(s.m); tray.push({ drink: s.d, fill: 1, mesh: s.m }); waiting.splice(i, 1);
       if (tray.length === 1) equip(); drawTray(); audio.tick(1320);
     }
@@ -422,6 +441,15 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyE') interact();
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (e.code === 'KeyG') altDown = true;
+  if (e.code === 'KeyC') cheers();
+  if (e.code === 'KeyX' && nearSnacks()) {
+    if (time < snackT) say('sal', 'Easy. Those have to last till Thursday.');
+    else { snackT = time + 20; linedT = 75; audio.crunch(); say('', pick(['Salty. Stale. Perfect.', 'Stomach: lined. The next few will land softer.', 'These pretzels predate the building.']), 3); }
+  }
+  if (e.code === 'KeyT' && nearBar() && !dlg) {
+    G.tab += 5; tips++; hudNumbers(); audio.tick(1200); happyNext -= 40;
+    say('sal', pick(["Appreciated. I'll remember that around happy hour.", 'A tipper! Doug, look, a tipper!', 'You just moved happy hour up. Funny how that works.']));
+  }
   if (e.code === 'KeyQ' && tray.length > 1 && mode === 'idle') { tray.push(tray.shift()); equip(); drawTray(); audio.tick(760); }
   if (e.code === 'KeyR' && inRange()) {
     if (time < restockT) say('doug', "Bell's cooling down. I'm one man.");
@@ -599,7 +627,7 @@ function updateAction(dt) {
     if (actionDown && !menuOpen && !needRelease && !dlg) {
       mode = 'drink';
       const df = Math.min(h.fill, dt / h.drink.time);
-      h.fill -= df; D.pending += h.drink.strength * df; h.mesh?.userData.setFill(h.fill);
+      h.fill -= df; D.pending += h.drink.strength * df * (linedT > 0 && h.drink.strength > 0 ? 0.7 : 1); h.mesh?.userData.setFill(h.fill);
       gulpT -= dt; if (gulpT <= 0) { audio.gulp(); gulpT = 0.32; }
       if (h.fill <= 0.0001) finishDrink(h);
       else el.tray.querySelector('.cur em')?.style.setProperty('--f', h.fill);
@@ -613,7 +641,7 @@ function updateAction(dt) {
   const drinking = mode === 'drink';
   sipTilt += ((drinking ? 0.1 + (1 - (h?.fill ?? 1)) * 0.22 : 0) - sipTilt) * Math.min(1, dt * 7);
   U.uSip.value += ((drinking ? 1 : 0) - U.uSip.value) * Math.min(1, dt * 6);
-  U.uBurn.value = Math.max(0, U.uBurn.value - dt * 0.9);
+  U.uBurn.value = Math.max(0, U.uBurn.value - dt * 0.9); linedT -= dt;
 
   // view-model pose
   handRise = Math.min(1, handRise + dt * 4);
@@ -720,9 +748,9 @@ function updateHints(dt) {
   let p = '';
   if (menuOpen || dlg || peeT > 0) p = '';
   else if (W.restroom.inside(P.pos)) p = nearToilet() ? "<kbd>E</kbd> answer nature's call" : '';
-  else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>`;
+  else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>` + (h && h.fill > 0 ? ' · <kbd>C</kbd> cheers' : '');
   else if (nearJuke() && !talkTo) p = '<kbd>E</kbd> change the song';
-  else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order a drink';
+  else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order · <kbd>T</kbd> tip Sal' + (nearSnacks() ? ' · <kbd>X</kbd> pretzels' : '');
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
   else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';

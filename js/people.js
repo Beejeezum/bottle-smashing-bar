@@ -13,7 +13,7 @@ const L = (a, b, k) => a + (b - a) * k;
 const POSES = {
   seated(j, t, f) {
     const sw = Math.sin(t * 1.1) * 0.02, bob = Math.sin(t * 5.4) * 0.008;
-    const cyc = (t * 0.11) % 1, sip = cyc < 0.14 ? Math.sin(cyc / 0.14 * Math.PI) : 0;
+    const cyc = (t * 0.11) % 1, sip = Math.max(cyc < 0.14 ? Math.sin(cyc / 0.14 * Math.PI) : 0, Math.sin(Math.min(1, f.toast || 0) * Math.PI));
     j.hip.set(sw * 0.3, 0.82, 0); j.chest.set(sw, 1.27, 0.1); j.head.set(sw * 1.5, 1.57 + bob + sip * 0.02, 0.15 - sip * 0.06);
     j.shL.set(-0.19 + sw, 1.3, 0.1); j.shR.set(0.19 + sw, 1.3, 0.1);
     j.elL.set(-0.3, 1.1, 0.32); j.haL.set(-0.12, 1.13, 0.52);
@@ -109,7 +109,7 @@ export class NeonFigure {
   hold(obj) { this.prop = obj; this.group.add(obj); }
 
   update(t, dt) {
-    const j = this.j;
+    const j = this.j; if (this.toast > 0) this.toast = Math.max(0, this.toast - dt * 0.8);
     POSES[this.pose](j, t + this.phase, this);
     j.neck.copy(j.head); j.neck.y -= 0.12;
     j.toL.copy(j.ftL); j.toL.z += 0.13; j.toR.copy(j.ftR); j.toR.z += 0.13;

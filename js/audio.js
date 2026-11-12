@@ -193,6 +193,17 @@ export class AudioSys {
     this.tone(o, 'sine', 180, 60, t, 0.16, 0.7); this.burst(o, 'bandpass', 500, 2600, 1.5, t + 0.03, 0.4, 0.3);
     this.tone(o, 'triangle', 700, 990, t, 0.12, 0.12);
   }
+  clink() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0.2, 0.3, 1);
+    [2100, 3350, 5200].forEach((f, i) => this.tone(o, 'sine', f, f * 0.995, t + i * 0.012, 0.7 / (i + 1), 0.16 / (i + 1)));
+    this.burst(o, 'highpass', 5000, 5000, 1, t, 0.02, 0.3);
+  }
+  crunch() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, 0.05, 1);
+    for (let i = 0; i < 5; i++) this.burst(o, 'bandpass', rnd(1800, 3200), 1200, 1.5, t + i * 0.13 + Math.random() * 0.04, 0.05, 0.35);
+  }
   stream(dur = 3) {
     if (!this.ready) return;
     const t = this.ctx.currentTime, o = this.out(0, 0.5, 1);

@@ -534,7 +534,7 @@ function throwIt() {
   throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1) * (perfect ? 0.2 : 1));
   m.position.copy(_o); m.scale.setScalar(1.5); scene.add(m);
   const sp = throwSpeed(charge) * (1 + (Math.random() - 0.5) * 0.25 * d);
-  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, life: 6, color: h.drink.glass ?? 0xdfefff });
+  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, perfect, lob, life: 6, color: h.drink.glass ?? 0xdfefff });
   if (perfect) { _c.copy(_o).addScaledVector(_dir, 2.5); fx.popup(_c, 'PERFECT', 'release', 'call'); audio.tick(1500); }
   G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0; fx.kick = 0.35;
   if (IN.on && IN.watch) violation();
@@ -566,7 +566,7 @@ function updateShots(dt) {
         s.hit = true; G.doug++; headline('DOUG STRUCK. AGAIN. RULE THREE IGNORED'); smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
         fx.popup(p, '-250', 'RULE THREE', 'bad'); dougTalk = 0; dougSay('ow'); audio.thud(range.where(p)); break;
       }
-      const hit = range.sweep(_a, p, 0.1);
+      const hit = range.sweep(_a, p, story.has('heavy') ? 0.17 : 0.1);
       if (hit) {
         _b.lerpVectors(_a, p, hit.k); curShot = s;
         const r = hit.target.hit({ vel: s.vel, point: _b }); curShot = null;
@@ -608,7 +608,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
-  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale, gold: !!t.o.gold });
+  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale, gold: !!t.o.gold, lob: !!(s && s.lob), label });
   hudNumbers();
 };
 
@@ -663,7 +663,7 @@ const hp = new THREE.Vector3(), hr = new THREE.Vector3();
 function finishDrink(h) {
   h.fill = 0; h.mesh?.userData.setFill(0); needRelease = true; mode = 'idle'; drawTray();
   const d = d01(), st = h.drink.strength, was = bladder;
-  bladder = Math.min(1.2, bladder + (h.drink.id === 'water' ? 0.24 : 0.16));
+  bladder = Math.min(1.2, bladder + (h.drink.id === 'water' ? 0.24 : 0.16) * (story.has('hollow') ? 0.5 : 1));
   if (bladder >= 0.75 && was < 0.75) sayQ.push(['', 'You should find the restroom soon. West wall, past the pool table.']);
   if (bladder >= 1 && was < 1) sayQ.push(['', 'It is now an emergency.']);
   setTimeout(() => audio.ahh(), 150);
@@ -686,7 +686,7 @@ function updateAction(dt) {
       else el.tray.querySelector('.cur em')?.style.setProperty('--f', h.fill);
     } else mode = 'idle';
   } else if (inRange()) {
-    if ((actionDown || altDown) && !needRelease && !dlg) { if (mode !== 'charge') lob = altDown && !actionDown; mode = 'charge'; charge = Math.min(1, charge + dt / 0.85); }
+    if ((actionDown || altDown) && !needRelease && !dlg) { if (mode !== 'charge') lob = altDown && !actionDown; mode = 'charge'; charge = Math.min(1, charge + dt / (story.has('quick') ? 0.6 : 0.85)); }
     else if (mode === 'charge') throwIt();
   } else mode = 'idle';
 
@@ -775,7 +775,7 @@ function updateStory(dt) {
   // happy hour comes round every few minutes
   if (story.phase !== 'lastcall' && seenRange) {
     happyNext -= dt;
-    if (happyNext <= 0 && happyT <= 0) { happyT = 40; happyNext = 200 + Math.random() * 80; W.happy = true; audio.bell(); toast('HAPPY HOUR'); sayQ.push(['sal', 'HAPPY HOUR! Forty seconds! Drinks are free and everything pays double!']); }
+    if (happyNext <= 0 && happyT <= 0) { happyT = story.has('long') ? 70 : 40; happyNext = 200 + Math.random() * 80; W.happy = true; audio.bell(); toast('HAPPY HOUR'); sayQ.push(['sal', 'HAPPY HOUR! Drinks are free and everything pays double!']); }
   }
   if (happyT > 0) {
     happyT -= dt; el.clock.textContent = 'HAPPY HOUR ' + Math.ceil(happyT); el.clock.classList.add('hot');

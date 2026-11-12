@@ -32,6 +32,15 @@ Everyone in the bar is a living neon sign. So are you: the hand holding your gla
 | Mr. Pemberton | arrives at last call | his things left alone; later, the golden duck hit three times | the building; later, free drinks |
 | The Inspector | night two, in the range | no airborne glassware | a permit, eventually |
 
+Four regulars have a second dare once the first is settled:
+
+| Who | Second dare | Gives |
+|---|---|---|
+| Tex | lob a bottle onto the golden duck | Quick Draw: faster wind-up |
+| Dolores | play the eight chimes low to high | Long Pour: happy hour lasts longer |
+| Hank | hit a clay pigeon in flight | Hollow Leg: bladder fills half as fast |
+| Rivet | bring down the chandelier | Heavy Glass: bottles hit wider |
+
 ## Drinking
 
 - Sal builds each drink on the bar in front of you: the glass fills, slides over, and waits until you take it.
@@ -55,8 +64,8 @@ Everyone in the bar is a living neon sign. So are you: the hand holding your gla
 ## Ideas not built yet
 
 - **Night three.** A rival bar's bowling team shows up for a throw-off: take turns against a neon opponent at the next lane.
-- **Regulars with second dares**, and friendships that change what they say as the nights go on.
+- **Second dares for Lime, Gus and Pearl**, and friendships that change what the regulars say as the nights go on.
 - **Throwing styles beyond two:** a sidearm skip that bounces off the floor.
 - **Pay the jukebox** to queue a song, and more songs.
 - **A morning-after screen** that remembers what you did and what the regulars thought of it.
-- **Saving the story** between visits (only best scores are saved now), and touch controls for phones.
+- **Touch controls** for phones.

@@ -8,7 +8,8 @@ export const CAST = {
 };
 
 export const PERKS = {
-  card: ["Pemberton's Card", 'every drink is free'],
+  card: ["Pemberton's Card", 'every drink is free'], quick: ['Quick Draw', 'faster wind-up'], heavy: ['Heavy Glass', 'bottles hit wider'],
+  hollow: ['Hollow Leg', 'bladder fills half as fast'], long: ['Long Pour', 'happy hour lasts longer'],
   steady: ['Steady Hand', 'less sway, tighter throws'], olive: ['Lucky Olive', 'streaks pay double'],
   liver: ['Iron Liver', 'aim arc lasts longer drunk'], shrapnel: ['Shrapnel', 'smashes hit neighbours'],
   pockets: ['All Pockets', 'carry nine drinks'], tips: ['Big Tipper', 'jar fills 50% faster'],
@@ -55,6 +56,26 @@ QUESTS.push({ id: 'pem', who: ['pem'], title: 'Hit the golden duck', need: 3, te
   done: [['pem', 'Hm. Adequate. More than adequate. Do NOT tell the others I smiled.'], ['pem', "Take my card. Your drinks are on Pemberton Holdings now. It's a write-off."]],
   idle: ['I own four parking lots. Nobody has ever cheered in one.', 'Sal put a tiny umbrella in my drink. I did not ask for it. I am keeping it.'] });
 
+// second dares, once the first is settled
+QUESTS.push(
+  { id: 'tex2', req: 'tex', who: ['tex'], title: 'Lob a bottle onto the golden duck', need: 1, test: e => e.gold && e.lob, perk: 'quick',
+    offer: [['tex', "You've got the hand for it. Now the hard one."], ['tex', 'That golden duck. Lob it. Right-click, high and slow, drop it on his head.']],
+    remind: [['tex', 'Has to be a lob. Anybody can throw straight.']],
+    done: [['tex', 'Thirty years I waited to see that.'], ['tex', "Here's the fast draw. Don't tell the fair."]], idle: ['Best night of my life, and I once won a goat.'] },
+  { id: 'dol2', req: 'dol', who: ['dol'], title: 'Play the chimes, low to high', need: 1, test: e => e.label === 'YOU PLAYED A SCALE', perk: 'long',
+    offer: [['dol', 'Gerald was tone-deaf, you know.'], ['dol', 'Those eight chimes over the range. Ring them in order, lowest to highest. For me.']],
+    remind: [['dol', 'Left to right, dear. Like reading. Gerald never read either.']],
+    done: [['dol', 'Oh, that was lovely. Wasted on this crowd.'], ['dol', "I've had a word with Sal about happy hour. It runs longer for you now."]], idle: ['I may take up the chimes myself.'] },
+  { id: 'hank2', req: 'hank', who: ['hank'], title: 'Hit a clay pigeon in flight', need: 1, test: e => e.type === 'plate', perk: 'hollow',
+    offer: [['hank', 'A target that stands still teaches you nothing.'], ['hank', 'When Doug yells PULL, a clay flies. Hit one out of the air.']],
+    remind: [['hank', "Don't aim where it is. Aim where it's decided to be."]],
+    done: [['hank', 'You met it halfway. That is all any of us can do.'], ['hank', 'A gift: the hollow leg. You will visit the restroom half as often.']], idle: ['The pigeon is clay. We are all clay.'] },
+  { id: 'riv2', req: 'riv', who: ['riv'], title: 'Bring down the chandelier', need: 1, test: e => e.type === 'chandelier' && e.killed, perk: 'heavy',
+    offer: [['riv', 'Disco ball was a warm-up.'], ['riv', 'The CHANDELIER. Four hits. I want to hear it land.']],
+    remind: [['riv', "It's still up there. Being fancy."]],
+    done: [['riv', 'I FELT THAT IN MY TEETH.'], ['riv', 'Sal keeps the thick bottles for me. Now for you. They hit wider.']], idle: ['I am going to frame a piece of that chandelier.'] },
+);
+
 const PEM_CRY = { trophy: 'My club championship trophy!', portrait: 'That portrait was OIL!', cat: 'Not Mr. Whiskers!', condo: 'That model cost more than this building!', forsale: '...That sign was a rental.' };
 
 export class Story {
@@ -71,7 +92,10 @@ export class Story {
     if (this.phase === 'saved') this.left = 0;
     this.dirty = true;
   }
-  quest(who) { return Object.values(this.q).find(q => q.d.who.includes(who)); }
+  quest(who) {
+    const all = Object.values(this.q).filter(q => q.d.who.includes(who));
+    return all.find(q => q.state !== 'claimed' && (!q.d.req || this.q[q.d.req].state === 'claimed')) ?? all.filter(q => q.state === 'claimed').at(-1) ?? all[0];
+  }
   marker(who) {
     if (who === 'lou') return !this.met.has('lou');
     if (who === 'pem' && this.phase !== 'saved') return this.phase === 'lastcall' && !this.met.has('pem');

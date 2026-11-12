@@ -292,7 +292,7 @@ class Target {
         this.state = 'fall'; this.life = 5;
         this.v.copy(p.vel).multiplyScalar(0.3); this.v.y += 3.2; this.v.x += 1;
         this.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9));
-        R.audio[T.snd](R.where(this.c)); R.score(this, this.o.pts ?? T.pts, this.o.label ?? T.label, true);
+        R.audio[T.snd](R.where(this.c)); R.score(this, (this.o.pts ?? T.pts) * (this.o.conv !== undefined ? Math.max(0.7, R.tempo || 1) : 1), this.o.label ?? T.label, true);
         if (this.type === 'teddy') R.fx.chunkBurst(this.c, p.vel, 0xf5f5f0, 8, 0.03);
         return 'block';
     }
@@ -362,7 +362,7 @@ class Target {
       const cyc = (t * 0.2 + o.popup * 0.37) % 1, up = cyc < 0.4 ? Math.min(1, Math.sin(cyc / 0.4 * Math.PI) * 2.2) : 0;
       g.position.y = this.home.y + up * 1.05; this.center(); return;
     }
-    if (o.conv !== undefined) { g.position.z = -8 + ((o.conv * 2 + t * 1.15) % 16); g.position.y = this.home.y + Math.abs(Math.sin(t * 3 + o.conv)) * 0.03; this.center(); }
+    if (o.conv !== undefined) { g.position.z = -8 + ((o.conv * 2 + this.R.convT * 1.15) % 16); g.position.y = this.home.y + Math.abs(Math.sin(t * 3 + o.conv)) * 0.03; this.center(); }
     else if (this.type === 'balloon') { g.position.y = this.home.y + Math.sin(t * 0.8 + this.ph) * 0.14; g.position.z = this.home.z + Math.sin(t * 0.5 + this.ph * 2) * 0.1; this.center(); }
     else if (this.b.piv) {
       this.angV += (-(9.8 / this.b.L) * Math.sin(this.ang) - 0.35 * this.angV) * dt; this.ang += this.angV * dt;
@@ -515,6 +515,7 @@ export class Range {
     return best ? { target: best, k: bt } : null;
   }
   update(dt, t) {
+    this.convT = (this.convT || 0) + dt * (this.tempo || 1);
     for (const x of this.targets) x.update(dt, t);
     if (this.active) { this.skeetT -= dt; if (this.skeetT <= 0) { this.skeetT = 12 + Math.random() * 9; this.pull(); } }
     this.tvT -= dt;

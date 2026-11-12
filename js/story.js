@@ -8,6 +8,7 @@ export const CAST = {
 };
 
 export const PERKS = {
+  card: ["Pemberton's Card", 'every drink is free'],
   steady: ['Steady Hand', 'less sway, tighter throws'], olive: ['Lucky Olive', 'streaks pay double'],
   liver: ['Iron Liver', 'aim arc lasts longer drunk'], shrapnel: ['Shrapnel', 'smashes hit neighbours'],
   pockets: ['All Pockets', 'carry nine drinks'], tips: ['Big Tipper', 'jar fills 50% faster'],
@@ -48,6 +49,12 @@ const QUESTS = [
     idle: ['Double or nothing, Pearl.', "Gus, you don't have nothing left to double."] },
 ];
 
+QUESTS.push({ id: 'pem', who: ['pem'], title: 'Hit the golden duck', need: 3, test: e => e.gold, perk: 'card', after: 'saved',
+  offer: [['pem', "Don't look at me. ...Fine. Sal says I have to 'participate'."], ['pem', 'There is a golden duck on that conveyor. I have decided I resent it.'], ['pem', 'Strike it three times. I shall observe. Disdainfully.']],
+  remind: [['pem', 'The duck persists. As do I.']],
+  done: [['pem', 'Hm. Adequate. More than adequate. Do NOT tell the others I smiled.'], ['pem', "Take my card. Your drinks are on Pemberton Holdings now. It's a write-off."]],
+  idle: ['I own four parking lots. Nobody has ever cheered in one.', 'Sal put a tiny umbrella in my drink. I did not ask for it. I am keeping it.'] });
+
 const PEM_CRY = { trophy: 'My club championship trophy!', portrait: 'That portrait was OIL!', cat: 'Not Mr. Whiskers!', condo: 'That model cost more than this building!', forsale: '...That sign was a rental.' };
 
 export class Story {
@@ -58,7 +65,7 @@ export class Story {
   has(p) { return this.perks.has(p); }
   quest(who) { return Object.values(this.q).find(q => q.d.who.includes(who)); }
   marker(who) {
-    if (who === 'pem') return this.phase === 'lastcall' && !this.met.has('pem');
+    if (who === 'pem' && this.phase !== 'saved') return this.phase === 'lastcall' && !this.met.has('pem');
     const q = this.quest(who); return !!q && who !== 'sal' && (q.state === 'new' || q.state === 'done');
   }
 
@@ -80,9 +87,7 @@ export class Story {
 
   talk(who) {
     this.met.add(who);
-    if (who === 'pem') return this.phase === 'saved'
-      ? [['pem', 'Parking lots. Nobody throws bottles at a parking lot. ...Do they?']]
-      : [['pem', 'So this is the establishment. Charming, in the way mould is charming.'], ['pem', 'I had my personal effects brought over to measure for the lobby.'], ['pem', 'Do NOT touch them.']];
+    if (who === 'pem' && this.phase !== 'saved') return [['pem', 'So this is the establishment. Charming, in the way mould is charming.'], ['pem', 'I had my personal effects brought over to measure for the lobby.'], ['pem', 'Do NOT touch them.']];
     const q = this.quest(who); if (!q) return [];
     if (q.state === 'new') { q.state = 'active'; this.dirty = true; return q.d.offer; }
     if (q.state === 'active') return [...q.d.remind, [q.d.who[0], `(${Math.min(q.n, q.d.need)} of ${q.d.need} so far.)`]];

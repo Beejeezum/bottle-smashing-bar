@@ -81,6 +81,7 @@ let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0,
 let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
 let happyT = 0, happyNext = 140, altDown = false, lob = false;
 let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
+const nearJuke = () => Math.hypot(P.pos.x + 6.9, P.pos.z + 1.5) < 1.5;
 const nearToilet = () => Math.hypot(P.pos.x - W.restroom.toilet.x, P.pos.z - W.restroom.toilet.z) < 1.1;
 const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
 const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your best night: ${best0.toLocaleString()}`;
@@ -135,6 +136,10 @@ const story = new Story({
     G.score += 5000; hudNumbers(); partyT = 6;
     setTimeout(() => { toast('THE BAR IS SAVED'); audio.cheer(1); audio.bell(); }, 900);
     setTimeout(receipt, 9000);
+    setTimeout(() => { // Pemberton stays, and takes a stool
+      pem.pose = 'seated'; pem.group.position.set(-3.6, 0, -4.1); pem.group.rotation.y = Math.PI;
+      W.colliders.push({ x0: -3.9, x1: -3.3, z0: -4.75, z1: -3.85 });
+    }, 15000);
     sayQ.push(['pem', "Enough! ENOUGH. Keep your wretched bar. I'm going into parking lots."], ['sal', "Bar's staying open, everybody! Next round's on the jar!"], ['', 'After hours now. Everything you break pays double.']);
   },
 });
@@ -237,7 +242,7 @@ function order(id, free) {
   const n = d.bundle || 1;
   if (bladder >= 1 && !free) { say('sal', pick(["Go. Restroom. I'm not mopping that again.", "You're doing the dance. West wall, past the pool table. Go."])); audio.tick(220); return; }
   if (carrying() + n > cap()) { say('sal', pick(["Finish what you're holding first, champ.", 'You have two hands. I counted.', "That's a lot of glass for one person."])); audio.tick(220); return; }
-  if (!free && happyT <= 0) G.tab += d.price;
+  if (!free && happyT <= 0 && !story.has('card')) G.tab += d.price;
   const li = el.list.querySelector(`[data-id="${id}"]`); li.classList.remove('hit'); void li.offsetWidth; li.classList.add('hit');
   for (let i = 0; i < n; i++) serveQ.push({ d, fast: n > 1 });
   const k = d01();
@@ -310,6 +315,11 @@ function interact() {
     peeT = 2.2 + bladder * 2; audio.stream(peeT); return;
   }
   if (talkTo) return startDlg(story.talk(talkTo));
+  if (nearJuke()) {
+    const s = audio.nextSong(); toast(s.name.toUpperCase()); audio.tick(700);
+    sayQ.push(['lime', s.tempo > 1.2 ? 'YES. The ducks hate this one. Watch them run.' : s.tempo < 0.8 ? 'Ohh, a slow one. Even the ducks are swaying.' : 'Classic. Never skip the house shuffle.']);
+    return;
+  }
   if (menuOpen) return openMenu(false);
   if (!nearBar()) return;
   if (!story.met.has('sal')) return startDlg(story.salIntro(), () => { order('lager', true); openMenu(true); });
@@ -392,7 +402,7 @@ function updateShots(dt) {
       if (wall) { p.y = Math.max(p.y, 0.05); smashShot(s, p); }
     }
     if (!s.dead) {
-      s.mesh.position.copy(s.pos);
+      s.mesh.position.copy(s.pos); fx.trail(s.pos, s.color);
       s.mesh.rotation.x += s.spin.x * dt; s.mesh.rotation.y += s.spin.y * dt; s.mesh.rotation.z += s.spin.z * dt;
       s.life -= dt; if (s.life <= 0) { scene.remove(s.mesh); s.dead = true; }
     }
@@ -413,7 +423,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
-  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale });
+  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale, gold: !!t.o.gold });
   hudNumbers();
 };
 
@@ -603,6 +613,7 @@ function updateHints(dt) {
   if (menuOpen || dlg || peeT > 0) p = '';
   else if (W.restroom.inside(P.pos)) p = nearToilet() ? "<kbd>E</kbd> answer nature's call" : '';
   else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>`;
+  else if (nearJuke() && !talkTo) p = '<kbd>E</kbd> change the song';
   else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order a drink';
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
   else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
@@ -635,7 +646,7 @@ function tick(dt) {
   } else if (!started) {
     camera.position.set(Math.sin(time * 0.2) * 0.6, 1.66, 15.2); camera.rotation.set(0.1, Math.sin(time * 0.15) * 0.04, 0);
   }
-  range.active = started && !paused && inRange();
+  range.active = started && !paused && inRange(); range.tempo = audio.tempo;
   range.update(dt, time); fx.update(dt);
 }
 requestAnimationFrame(frame);

@@ -3,6 +3,14 @@
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
 
+// jukebox: div = steps per beat; tempo scales how fast the ducks run
+export const SONGS = [
+  { name: 'House Shuffle', fn: 'playStep', bpm: 108, div: 3, tempo: 1 },
+  { name: "Surf's Down", fn: 'playSurf', bpm: 156, div: 2, tempo: 1.55 },
+  { name: 'Slow Dance (Last One, I Swear)', fn: 'playSlow', bpm: 64, div: 3, tempo: 0.5 },
+  { name: 'Polka Emergency', fn: 'playPolka', bpm: 132, div: 2, tempo: 1.3 },
+];
+
 export class AudioSys {
   constructor() { this.ready = false; this.drunk = 0; }
 
@@ -240,9 +248,9 @@ export class AudioSys {
     if (ctx.state !== 'running') return;
     if (this.nextT < ctx.currentTime - 0.5) this.nextT = ctx.currentTime + 0.05;
     while (this.nextT < ctx.currentTime + 0.16) {
-      this.playStep(this.seq, this.nextT);
-      const bpm = 108 - this.drunk * 14;
-      this.nextT += 60 / bpm / 3;
+      const song = SONGS[this.song || 0];
+      this[song.fn](this.seq, this.nextT);
+      this.nextT += 60 / (song.bpm * (1 - 0.13 * this.drunk)) / song.div;
       this.seq++;
     }
   }
@@ -271,6 +279,42 @@ export class AudioSys {
       const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400; lp.connect(M);
       this.tone(lp, 'square', f, f * (Math.random() < 0.3 ? 1.06 : 1), t, 0.22, 0.07, wob);
     }
+  }
+
+  lp(freq) { const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq; f.connect(this.musicLP); return f; }
+  nextSong() { this.song = ((this.song || 0) + 1) % SONGS.length; this.seq = 0; return SONGS[this.song]; }
+  get tempo() { return SONGS[this.song || 0].tempo; }
+
+  // surf instrumental in E minor: straight eighths, tremolo-picked lead
+  playSurf(s, t) {
+    const M = this.musicLP, bar = Math.floor(s / 8) % 8, pos = s % 8, wob = Math.sin(t * 1.3) * this.drunk * 35;
+    const root = [82.41, 82.41, 98, 110, 82.41, 82.41, 123.47, 123.47][bar];
+    if (pos % 4 === 0) this.tone(M, 'sine', 140, 45, t, 0.18, 0.9);
+    if (pos % 4 === 2) { this.burst(M, 'bandpass', 2100, 2100, 0.8, t, 0.13, 0.5); this.tone(M, 'triangle', 220, 160, t, 0.08, 0.25); }
+    this.burst(M, 'highpass', 8000, 8000, 0.7, t, 0.03, pos % 2 ? 0.06 : 0.11);
+    this.tone(this.lp(600), 'sawtooth', root * (pos === 6 ? 1.5 : 1), root, t, 0.15, 0.45, wob);
+    const mel = [0, 3, 5, 7, 10, 7, 5, 3, 12, 10, 7, 5, 7, 3, 0, -2][(bar * 3 + pos) % 16];
+    if (bar % 2 === 0 || pos < 5) { const f = root * 4 * Math.pow(2, mel / 12), l = this.lp(3200); for (let k = 0; k < 2; k++) this.tone(l, 'sawtooth', f, f, t + k * 0.09, 0.08, 0.06, wob + 5); }
+  }
+  // slow dance in C: 12/8, soft pad and arpeggio
+  playSlow(s, t) {
+    const M = this.musicLP, bar = Math.floor(s / 12) % 4, pos = s % 12, wob = Math.sin(t * 1.3) * this.drunk * 35;
+    const [root, minor] = [[130.81, 0], [110, 1], [87.31, 0], [98, 0]][bar], tri = [1, minor ? 1.189 : 1.26, 1.498];
+    if (pos === 0 || pos === 6) this.tone(M, 'sine', 110, 45, t, 0.25, 0.7);
+    if (pos === 3 || pos === 9) this.burst(M, 'bandpass', 1500, 1500, 0.6, t, 0.2, 0.22);
+    this.burst(M, 'highpass', 7000, 7000, 0.7, t, 0.05, 0.05);
+    if (pos === 0 || pos === 6) this.tone(this.lp(400), 'triangle', root / (pos ? 1.335 : 1), root / (pos ? 1.335 : 1), t, 0.8, 0.5, wob);
+    if (pos === 0) tri.forEach(m => this.tone(this.lp(1200), 'sawtooth', root * 2 * m, root * 2 * m, t, 2.6, 0.035, wob + rnd(-8, 8)));
+    const a = root * 4 * tri[[0, 1, 2, 1, 2, 1][pos % 6]]; this.tone(M, 'triangle', a, a, t, 0.35, 0.07, wob);
+  }
+  // polka emergency in F: oom-pah, far too fast
+  playPolka(s, t) {
+    const M = this.musicLP, bar = Math.floor(s / 4) % 8, pos = s % 4, wob = Math.sin(t * 1.3) * this.drunk * 35;
+    const root = [87.31, 87.31, 130.81, 130.81, 130.81, 130.81, 87.31, 87.31][bar];
+    if (pos % 2 === 0) { this.tone(M, 'sine', 130, 50, t, 0.15, 0.8); this.tone(this.lp(500), 'sawtooth', root * (pos ? 1.498 : 1), root * (pos ? 1.498 : 1), t, 0.16, 0.5, wob); }
+    else { this.burst(M, 'bandpass', 2400, 2400, 1, t, 0.07, 0.3); [1, 1.26, 1.498].forEach(m => this.tone(this.lp(2200), 'square', root * 2 * m, root * 2 * m, t, 0.1, 0.035, wob)); }
+    const n = [0, 2, 4, 5, 7, 9, 7, 5, 4, 5, 7, 12, 9, 7, 4, 2][(s * 5 + bar) % 16], f = root * 4 * Math.pow(2, n / 12);
+    this.tone(this.lp(2600), 'square', f, f, t, 0.14, 0.05, wob + 4);
   }
 
   // drunk 0..1, range 0..1 (in the warehouse), outside 0..1 (on the street)

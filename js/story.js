@@ -4,7 +4,7 @@ export const CAST = {
   sal: { name: 'SAL', color: '#fff0c4' }, tex: { name: 'TEX', color: '#ff2d95' }, dol: { name: 'DOLORES', color: '#00e5ff' },
   hank: { name: 'HANK', color: '#ffe600' }, riv: { name: 'RIVET', color: '#b26bff' }, lime: { name: 'LIME', color: '#9dff00' },
   gus: { name: 'GUS', color: '#ff8a00' }, pearl: { name: 'PEARL', color: '#ff5ad0' }, doug: { name: 'DOUG', color: '#ff7a2a' },
-  pem: { name: 'MR. PEMBERTON', color: '#c8ffd8' }, insp: { name: 'THE INSPECTOR', color: '#ff7a6a' }, '': { name: '', color: '#fff' },
+  pem: { name: 'MR. PEMBERTON', color: '#c8ffd8' }, insp: { name: 'THE INSPECTOR', color: '#ff7a6a' }, lou: { name: 'LOU', color: '#4ad6c8' }, '': { name: '', color: '#fff' },
 };
 
 export const PERKS = {
@@ -65,6 +65,7 @@ export class Story {
   has(p) { return this.perks.has(p); }
   quest(who) { return Object.values(this.q).find(q => q.d.who.includes(who)); }
   marker(who) {
+    if (who === 'lou') return !this.met.has('lou');
     if (who === 'pem' && this.phase !== 'saved') return this.phase === 'lastcall' && !this.met.has('pem');
     const q = this.quest(who); return !!q && who !== 'sal' && (q.state === 'new' || q.state === 'done');
   }
@@ -86,6 +87,13 @@ export class Story {
   }
 
   talk(who) {
+    if (who === 'lou') {
+      const first = !this.met.has('lou'); this.met.add('lou');
+      if (first) return [['lou', 'ID?'], ['lou', "...Kidding. Nobody's ever checked. I'm Lou. I bounce. Mostly I stand."], ['lou', "Tip: Sal talks. The regulars dare. And don't hit Doug."]];
+      const L = this.phase === 'saved' ? ["Heard you saved the place. I'd have helped, but I was standing here.", 'Pemberton tipped me on the way in. A nickel. I framed it.']
+        : ["Still raining. It's always raining. I think it's just this street.", 'Loud in there tonight. Good loud.', 'If you black out, Doug carries you. If Doug blacks out, I carry Doug.'];
+      return [['lou', L[Math.floor(Math.random() * L.length)]]];
+    }
     this.met.add(who);
     if (who === 'pem' && this.phase !== 'saved') return [['pem', 'So this is the establishment. Charming, in the way mould is charming.'], ['pem', 'I had my personal effects brought over to measure for the lobby.'], ['pem', 'Do NOT touch them.']];
     const q = this.quest(who); if (!q) return [];

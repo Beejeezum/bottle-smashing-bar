@@ -170,6 +170,37 @@ const markTex = (() => {
 })();
 const pem = new NeonFigure({ color: 0xc8ffd8, pose: 'chat', hat: 'top', phase: 3, boost: 1.4 });
 pem.group.position.set(11.2, 0, 8.5); pem.group.rotation.y = Math.PI * 0.85; pem.group.visible = false; scene.add(pem.group); W.figures.push(pem); W.npc.pem = pem;
+const lou = new NeonFigure({ color: 0x4ad6c8, pose: 'chat', hat: 'cap', phase: 2.2, boost: 1.7 });
+lou.group.position.set(2.9, 0, 11.4); lou.group.rotation.y = -0.5; scene.add(lou.group); W.figures.push(lou); W.npc.lou = lou;
+W.colliders.push({ x0: 2.6, x1: 3.2, z0: 11.1, z1: 11.7 });
+
+// weather and air: rain on the street, haze in the bar, dust in the range lights
+const RN = 260, rainPos = new Float32Array(RN * 6), rainD = [];
+for (let i = 0; i < RN; i++) rainD.push({ x: -10 + Math.random() * 20, y: Math.random() * 8, z: 10.5 + Math.random() * 9, v: 9 + Math.random() * 5 });
+const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0x9fb8d8, transparent: true, opacity: 0.3 })); rain.frustumCulled = false; scene.add(rain);
+const flash = new THREE.PointLight(0xcfe0ff, 0, 60, 1.2); flash.position.set(0, 12, 20); scene.add(flash);
+let thunderT = 9;
+const hazeTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const haze = [];
+for (let i = 0; i < 12; i++) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: hazeTex, color: [0xffb070, 0xff5aa0, 0x70d0ff][i % 3], transparent: true, opacity: 0.04, depthWrite: false }));
+  s.position.set(-7 + Math.random() * 14, 1.9 + Math.random() * 1.2, -6 + Math.random() * 14); s.scale.setScalar(3.5 + Math.random() * 2.5); s.userData.p = s.position.clone(); scene.add(s); haze.push(s);
+}
+const motes = (() => {
+  const n = 320, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { p[i * 3] = 14 + Math.random() * 18; p[i * 3 + 1] = 0.5 + Math.random() * 8; p[i * 3 + 2] = -9 + Math.random() * 18; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff0d0, size: 0.035, transparent: true, opacity: 0.5, depthWrite: false })); scene.add(m); return m;
+})();
+function updateAir(dt) {
+  haze.forEach((s, i) => { s.position.x = s.userData.p.x + Math.sin(time * 0.07 + i) * 1.2; s.position.z = s.userData.p.z + Math.cos(time * 0.05 + i * 2) * 1.2; });
+  motes.position.y = Math.sin(time * 0.13) * 0.4; motes.position.z = Math.sin(time * 0.07) * 0.5;
+  rain.visible = P.pos.z > 5; flash.intensity = Math.max(0, flash.intensity - dt * 900);
+  if (!rain.visible) return;
+  for (let i = 0; i < RN; i++) { const d = rainD[i]; d.y -= d.v * dt; if (d.y < 0) { d.y = 7 + Math.random() * 2; d.x = P.pos.x - 10 + Math.random() * 20; } const o = i * 6; rainPos[o] = d.x; rainPos[o + 1] = d.y; rainPos[o + 2] = d.z; rainPos[o + 3] = d.x + 0.03; rainPos[o + 4] = d.y + 0.4; rainPos[o + 5] = d.z; }
+  rainGeo.attributes.position.needsUpdate = true;
+  thunderT -= dt; if (thunderT <= 0) { thunderT = 18 + Math.random() * 25; flash.intensity = 500; audio.thunder(); }
+}
 const marks = {};
 for (const id in W.npc) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTex, depthWrite: false })); s.material.color.setScalar(2);
@@ -776,7 +807,7 @@ function frame(now) {
 }
 function tick(dt) {
   time += dt;
-  W.update(time, dt);
+  W.update(time, dt); updateAir(dt);
   if (started && !paused) {
     updateNews(dt); updateMovers(dt); updateInspector(dt);
     updatePlayer(dt); updateServe(dt); updateAction(dt); updateDoug(dt); updateShots(dt); updateDrunk(dt); updateStory(dt); updateHints(dt);

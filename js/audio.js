@@ -37,6 +37,11 @@ export class AudioSys {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
     this.startMurmur();
+    { // rain on the street
+      const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 0.4;
+      this.rain = ctx.createGain(); this.rain.gain.value = 0; s.connect(f); f.connect(this.rain); this.rain.connect(this.master); s.start();
+    }
     this.seq = 0; this.nextT = ctx.currentTime + 0.2;
     setInterval(() => this.sched(), 40);
     this.ready = true;
@@ -193,6 +198,11 @@ export class AudioSys {
     this.tone(o, 'sine', 180, 60, t, 0.16, 0.7); this.burst(o, 'bandpass', 500, 2600, 1.5, t + 0.03, 0.4, 0.3);
     this.tone(o, 'triangle', 700, 990, t, 0.12, 0.12);
   }
+  thunder() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, 0.8, 1);
+    this.burst(o, 'lowpass', 220, 60, 0.7, t + 0.15, 2.6, 0.9); this.burst(o, 'lowpass', 900, 200, 0.7, t + 0.15, 0.5, 0.4);
+  }
   clink() {
     if (!this.ready) return;
     const t = this.ctx.currentTime, o = this.out(0.2, 0.3, 1);
@@ -337,5 +347,6 @@ export class AudioSys {
     this.musicGain.gain.setTargetAtTime(0.5 - 0.3 * far, t, 0.2);
     this.musicLP.frequency.setTargetAtTime((8500 - 6500 * range - 8000 * outside) * (1 - 0.7 * drunk) + 350, t, 0.2);
     this.murmur.gain.setTargetAtTime(0.16 * (1 - 0.75 * range) * (1 - 0.9 * outside), t, 0.3);
+    this.rain.gain.setTargetAtTime(0.02 * (1 - range) + 0.13 * outside, t, 0.3);
   }
 }

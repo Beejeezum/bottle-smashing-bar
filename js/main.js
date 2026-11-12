@@ -521,7 +521,7 @@ addEventListener('keydown', e => {
   }
   if (e.code === 'KeyB' && inRange() && frenzyT <= 0 && story.phase !== 'lastcall') {
     if (time < frenzyCool) say('doug', 'Give me a second to restack.');
-    else { frenzyT = 60; frenzyScore = 0; range.restock(); audio.bell(); toast("DOUG'S SIXTY"); dougTalk = time + 6; say('doug', 'Sixty seconds. The crate of empties is on me. GO.', 3); }
+    else { frenzyT = story.has('vip') ? 90 : 60; frenzyScore = 0; range.restock(); audio.bell(); toast("DOUG'S SIXTY"); dougTalk = time + 6; say('doug', 'Sixty seconds. The crate of empties is on me. GO.', 3); }
   }
   if (e.code === 'KeyX' && nearSnacks()) {
     if (time < snackT) say('sal', 'Easy. Those have to last till Thursday.');
@@ -533,7 +533,7 @@ addEventListener('keydown', e => {
   }
   if (e.code === 'KeyQ' && tray.length > 1 && mode === 'idle') { tray.push(tray.shift()); equip(); drawTray(); audio.tick(760); }
   if (e.code === 'KeyR' && inRange()) {
-    if (time < restockT) say('doug', "Bell's cooling down. I'm one man.");
+    if (time < restockT && !story.has('encore')) say('doug', "Bell's cooling down. I'm one man.");
     else { const n = range.restock(); restockT = time + 30; audio.bell(); dougTalk = 0; say('doug', n ? 'Fresh stock! ' + n + ' new things to ruin!' : "Nothing's broken. Ring it when you've earned it."); }
   }
   if (menuOpen && /^Digit\d$/.test(e.code)) { const d = DRINKS.find(x => x.key === e.code.slice(5)); if (d) order(d.id); }
@@ -646,7 +646,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
-  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale, gold: !!t.o.gold, lob: !!(s && s.lob), label });
+  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale, gold: !!t.o.gold, lob: !!(s && s.lob), label, tempo: audio.tempo });
   hudNumbers();
 };
 
@@ -830,7 +830,7 @@ function updateStory(dt) {
       const best = store.get('bsb-sixty'), rec = frenzyScore > best; if (rec) store.set('bsb-sixty', frenzyScore);
       frenzyCool = time + 15; el.eye.className = ''; toast('TIME!'); audio.bell(); dougTalk = time + 6;
       say('doug', frenzyScore.toLocaleString() + (rec ? '. New house record. I am putting it on the wall.' : '. House record is ' + best.toLocaleString() + '. Sweeping up now.'), 5);
-      headline("DOUG'S SIXTY: " + frenzyScore.toLocaleString() + ' POINTS OF DAMAGE');
+      headline("DOUG'S SIXTY: " + frenzyScore.toLocaleString() + ' POINTS OF DAMAGE'); story.event({ sixty: frenzyScore });
     }
   }
   // restroom: your reflection, and relief

@@ -9,7 +9,7 @@ export const CAST = {
 
 export const PERKS = {
   card: ["Pemberton's Card", 'every drink is free'], quick: ['Quick Draw', 'faster wind-up'], heavy: ['Heavy Glass', 'bottles hit wider'],
-  hollow: ['Hollow Leg', 'bladder fills half as fast'], long: ['Long Pour', 'happy hour lasts longer'],
+  hollow: ['Hollow Leg', 'bladder fills half as fast'], encore: ['With the Band', 'restock bell never cools down'], vip: ['House Favourite', "Doug's Sixty runs ninety"], long: ['Long Pour', 'happy hour lasts longer'],
   steady: ['Steady Hand', 'less sway, tighter throws'], olive: ['Lucky Olive', 'streaks pay double'],
   liver: ['Iron Liver', 'aim arc lasts longer drunk'], shrapnel: ['Shrapnel', 'smashes hit neighbours'],
   pockets: ['All Pockets', 'carry nine drinks'], tips: ['Big Tipper', 'jar fills 50% faster'],
@@ -74,6 +74,17 @@ QUESTS.push(
     offer: [['riv', 'Disco ball was a warm-up.'], ['riv', 'The CHANDELIER. Four hits. I want to hear it land.']],
     remind: [['riv', "It's still up there. Being fancy."]],
     done: [['riv', 'I FELT THAT IN MY TEETH.'], ['riv', 'Sal keeps the thick bottles for me. Now for you. They hit wider.']], idle: ['I am going to frame a piece of that chandelier.'] },
+);
+
+QUESTS.push(
+  { id: 'lime2', req: 'lime', who: ['lime'], title: 'Smashes during the slow song', need: 3, test: e => e.killed && e.tempo < 0.8, perk: 'encore',
+    offer: [['lime', 'Okay okay okay. New idea.'], ['lime', 'Put the slow song on the jukebox. Then break three things. Gently. Romantically.']],
+    remind: [['lime', 'Slow song first! Jukebox is right there!']],
+    done: [['lime', 'That was the most beautiful destruction I have ever swayed to.'], ['lime', "I told Doug you're with the band. Ring that restock bell as often as you like."]], idle: ['Every song is a slow song if you believe.'] },
+  { id: 'gp2', req: 'gp', who: ['gus', 'pearl'], title: "Score 3,000 in Doug's Sixty", need: 1, test: e => e.sixty >= 3000, perk: 'vip',
+    offer: [['gus', 'Double or nothing, Pearl.'], ['pearl', "Fine. Three thousand points in Doug's Sixty. Press B at the counter, hon."], ['gus', 'Never happen.']],
+    remind: [['pearl', "Three thousand. In the Sixty. I've already spent the money."]],
+    done: [['pearl', 'GUS. WALLET.'], ['gus', 'I need to sit down. I am sitting down. I need to lie down.'], ['pearl', "Doug owes me a favour. Your Sixty runs ninety seconds now."]], idle: ["Don't talk to Gus. He's doing sums."] },
 );
 
 const PEM_CRY = { trophy: 'My club championship trophy!', portrait: 'That portrait was OIL!', cat: 'Not Mr. Whiskers!', condo: 'That model cost more than this building!', forsale: '...That sign was a rental.' };

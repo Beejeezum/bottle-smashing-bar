@@ -15,6 +15,7 @@ export class AudioSys {
   constructor() { this.ready = false; this.drunk = 0; }
 
   init() {
+    if (new URLSearchParams(location.search).has('mute')) return; // ?mute keeps the whole game silent
     if (this.ready) { this.ctx.resume(); return; }
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return;

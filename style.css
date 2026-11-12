@@ -124,3 +124,6 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #settings { margin-top: 26px; display: inline-flex; gap: 26px; padding: 12px 20px; background: rgba(10,7,9,.6); border-radius: 10px; font-size: 18px; cursor: default; }
 #settings label { display: flex; align-items: center; gap: 10px; }
 #settings input { accent-color: var(--amber); width: 140px; }
+
+#cross.hit circle:first-child { animation: hitmark .25s ease-out; }
+@keyframes hitmark { 0% { r: 9; fill: #fff; } 100% { r: 2; } }

@@ -164,6 +164,12 @@ const BUILD = {
     P(g, CYL, S(0xff6a1a, 0.5), 0, 0, 0, .2, .03, .2); P(g, CYL, S(0x222222, 0.5), 0, .01, 0, .12, .03, .12);
     return { g, r: 0.3, cy: 0 };
   },
+  popup() {
+    const g = new THREE.Group(), card = S(0xb89a70, 0.9);
+    P(g, BOX, card, 0, .4, 0, .5, .72, .03); P(g, BOX, card, 0, -.3, 0, .05, .8, .03);
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(.44, .62), tex.portraitMat); pic.position.set(0, .4, .017); g.add(pic);
+    return { g, r: 0.36, cy: 0.4 };
+  },
   trophy() {
     const g = new THREE.Group();
     P(g, TROPHY, GOLD, 0, 0, 0);
@@ -231,6 +237,7 @@ const TYPES = {
   cake: { kind: 'splat', pts: 140, label: 'CAKE', debris: [0xfff6ea, 0xff9ac0, 0xfff6ea, 0xd61f2c] },
   flamingo: { kind: 'knock', pts: 90, label: 'FLAMINGO', snd: 'thud' },
   plate: { kind: 'ceramic', pts: 350, label: 'CLAY PIGEON', debris: [0xff6a1a, 0x222222] },
+  popup: { kind: 'ceramic', pts: 250, label: 'POP-UP PEMBERTON', debris: [0xb89a70, 0x8a6a40, 0xe6c2a0], respawn: 4 },
   trophy: { kind: 'ceramic', pts: 1000, label: "PEMBERTON'S TROPHY", debris: [0xd9a520, 0xffe08a], coins: true },
   portrait: { kind: 'ceramic', pts: 1000, label: 'THE PORTRAIT', debris: [0xd9a520, 0x5a3a20, 0xe8d8c0] },
   cat: { kind: 'ceramic', pts: 1000, label: 'MR. WHISKERS', hp: 2, debris: [0xffffff, 0xd61f2c, 0xd9a520] },
@@ -351,6 +358,10 @@ class Target {
       return;
     }
     if (this.b.fish) this.b.fish.rotation.y += dt * 1.6;
+    if (o.popup !== undefined) { // cardboard landlords bob up from behind the duck board
+      const cyc = (t * 0.2 + o.popup * 0.37) % 1, up = cyc < 0.4 ? Math.min(1, Math.sin(cyc / 0.4 * Math.PI) * 2.2) : 0;
+      g.position.y = this.home.y + up * 1.05; this.center(); return;
+    }
     if (o.conv !== undefined) { g.position.z = -8 + ((o.conv * 2 + t * 1.15) % 16); g.position.y = this.home.y + Math.abs(Math.sin(t * 3 + o.conv)) * 0.03; this.center(); }
     else if (this.type === 'balloon') { g.position.y = this.home.y + Math.sin(t * 0.8 + this.ph) * 0.14; g.position.z = this.home.z + Math.sin(t * 0.5 + this.ph * 2) * 0.1; this.center(); }
     else if (this.b.piv) {
@@ -433,6 +444,8 @@ export class Range {
     sh(B(0.7, 0.9, 1.7, wood(), 17, 0.45, 3, { stat: 1 }));
     add('fishbowl', 17, 0.9, 3, { color: 0x9fd8ff, s: 1.2 }); add('lava', 17, 0.9, 2.4, { color: 0xff2d95, s: 1.2 }); add('lava', 17, 0.9, 3.6, { color: 0x39ff88, s: 1.2 });
     add('duck', 20.6, 1.48, 0, { conv: 0.5, ry: 0, s: 1.25, gold: true, pts: 300, label: 'GOLDEN DUCK' });
+
+    [-6, -2, 2, 6].forEach((z, i) => add('popup', 21.35, 0.72, z, { popup: i, s: 1.15 }));
 
     // --- skeet: clay pigeons get flung across the range while you're at the counter ---
     [-1, 1].forEach(sd => sh(B(0.7, 0.6, 0.5, flat(0x2a2f33, { r: 0.5, m: 0.5 }), 18.8, 0.3, 10.5 * sd)));

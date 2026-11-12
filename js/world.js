@@ -205,6 +205,7 @@ export function buildWorld(scene) {
   };
   sp(19, 0, 1000, true); sp(29, 0, 1000, false);
   const wl = new THREE.PointLight(0xff3da0, 60, 22, 2); wl.position.set(33, 5, 0); scene.add(wl);
+  W.ticks.push(t => { wl.intensity = W.happy ? 190 + Math.sin(t * 9) * 90 : 60; pinkL.intensity = W.happy ? 22 + Math.sin(t * 9) * 8 : 9; });
   const wl2 = new THREE.PointLight(0xffc27a, 22, 14, 2); wl2.position.set(11, 3.2, 0); scene.add(wl2);
   // the throwing counter, with a carnival marquee of chasing bulbs
   B(0.9, 1.02, 22, darkWood(1, 6), 13.35, 0.51, 0, { col: 1, stat: 1 });
@@ -217,8 +218,8 @@ export function buildWorld(scene) {
   scene.add(bulbs);
   let lastPh = -1;
   W.ticks.push(t => {
-    const ph = Math.floor(t * 7); if (ph === lastPh) return; lastPh = ph;
-    for (let i = 0; i < NB; i++) { (i + ph) % 3 === 0 ? ccol.setRGB(3.4, 2.4, 1.0) : ccol.setRGB(0.25, 0.14, 0.05); bulbs.setColorAt(i, ccol); }
+    const ph = Math.floor(t * (W.happy ? 16 : 7)); if (ph === lastPh) return; lastPh = ph;
+    for (let i = 0; i < NB; i++) { (i + ph) % 3 === 0 ? (W.happy ? ccol.setRGB(3.4, 0.6, 1.8) : ccol.setRGB(3.4, 2.4, 1.0)) : ccol.setRGB(0.25, 0.14, 0.05); bulbs.setColorAt(i, ccol); }
     bulbs.instanceColor.needsUpdate = true;
   });
   sign('SMASH RANGE', { color: '#ffb300', px: 150 }, 6.5, 13.15, 4.7, 0, -Math.PI / 2);

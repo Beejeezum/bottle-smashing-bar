@@ -79,6 +79,7 @@ let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
 let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
 let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
+let happyT = 0, happyNext = 140, altDown = false, lob = false;
 let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
 const nearToilet = () => Math.hypot(P.pos.x - W.restroom.toilet.x, P.pos.z - W.restroom.toilet.z) < 1.1;
 const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
@@ -236,7 +237,7 @@ function order(id, free) {
   const n = d.bundle || 1;
   if (bladder >= 1 && !free) { say('sal', pick(["Go. Restroom. I'm not mopping that again.", "You're doing the dance. West wall, past the pool table. Go."])); audio.tick(220); return; }
   if (carrying() + n > cap()) { say('sal', pick(["Finish what you're holding first, champ.", 'You have two hands. I counted.', "That's a lot of glass for one person."])); audio.tick(220); return; }
-  if (!free) G.tab += d.price;
+  if (!free && happyT <= 0) G.tab += d.price;
   const li = el.list.querySelector(`[data-id="${id}"]`); li.classList.remove('hit'); void li.offsetWidth; li.classList.add('hit');
   for (let i = 0; i < n; i++) serveQ.push({ d, fast: n > 1 });
   const k = d01();
@@ -295,7 +296,8 @@ addEventListener('mousemove', e => {
   }
 });
 canvas.addEventListener('mousedown', e => { if (!started) return; if (e.button === 0) { if (!locked && !noLock) lock(); if (dlg) advDlg(); else actionDown = true; } });
-addEventListener('mouseup', e => { if (e.button === 0) actionDown = false; });
+addEventListener('mouseup', e => { if (e.button === 0) actionDown = false; if (e.button === 2) altDown = false; });
+canvas.addEventListener('mousedown', e => { if (started && e.button === 2 && locked) altDown = true; });
 addEventListener('contextmenu', e => e.preventDefault());
 
 let talkTo = null;
@@ -319,9 +321,10 @@ addEventListener('keydown', e => {
   if (!started || paused) return;
   if (e.code === 'KeyE') interact();
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
+  if (e.code === 'KeyG') altDown = true;
   if (menuOpen && /^Digit\d$/.test(e.code)) { const d = DRINKS.find(x => x.key === e.code.slice(5)); if (d) order(d.id); }
 });
-addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyF' || e.code === 'Space') actionDown = false; });
+addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyG') altDown = false; if (e.code === 'KeyF' || e.code === 'Space') actionDown = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; actionDown = false; });
 
 const nearBar = () => P.pos.z < -3.1 && P.pos.x < 6.2;
@@ -334,11 +337,11 @@ function throwOrigin(out) {
   return out.copy(camera.position).addScaledVector(_a, 0.45).addScaledVector(_b, 0.22).add(_c.set(0, -0.12, 0));
 }
 function aimDir(out, err) {
-  camera.getWorldDirection(out); out.y += 0.09;
+  camera.getWorldDirection(out); out.y += lob ? 0.6 : 0.09;
   if (err) { out.x += (Math.random() - 0.5) * err; out.y += (Math.random() - 0.5) * err; out.z += (Math.random() - 0.5) * err; }
   return out.normalize();
 }
-const throwSpeed = c => 9 + 16 * c;
+const throwSpeed = c => lob ? 6.5 + 8.5 * c : 9 + 16 * c;
 
 function throwIt() {
   const h = tray.shift(); const d = d01();
@@ -346,7 +349,7 @@ function throwIt() {
   throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1));
   m.position.copy(_o); m.scale.setScalar(1.5); scene.add(m);
   const sp = throwSpeed(charge) * (1 + (Math.random() - 0.5) * 0.25 * d);
-  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, life: 6, color: h.drink.glass ?? 0xdfefff });
+  shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, kills: 0, life: 6, color: h.drink.glass ?? 0xdfefff });
   G.thrown++; audio.whoosh(); mode = 'idle'; charge = 0;
   setTimeout(() => { equip(); drawTray(); }, 280); drawTray();
 }
@@ -400,7 +403,9 @@ function updateShots(dt) {
 range.onScore = (pts, label, pos, t, killed) => {
   const s = curShot;
   if (s && !s.hit) { s.hit = true; G.hits++; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
-  const mult = (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
+  if (s && killed && ++s.kills > 1) { const b = s.kills === 2 ? 'DOUBLE!' : s.kills === 3 ? 'TRIPLE!' : 'CARNAGE!'; _c.copy(pos).y += 0.5; fx.popup(_c, b, 'one bottle', 'call'); pts += 60 * s.kills; }
+  el.cross.classList.remove('hit'); void el.cross.offsetWidth; el.cross.classList.add('hit');
+  const mult = (happyT > 0 ? 2 : 1) * (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
   const n = Math.max(5, Math.round(pts * mult / 5) * 5);
   G.score += n; if (killed) G.smashed++;
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
@@ -485,7 +490,7 @@ function updateAction(dt) {
       else el.tray.querySelector('.cur em')?.style.setProperty('--f', h.fill);
     } else mode = 'idle';
   } else if (inRange()) {
-    if (actionDown && !needRelease && !dlg) { mode = 'charge'; charge = Math.min(1, charge + dt / 0.85); }
+    if ((actionDown || altDown) && !needRelease && !dlg) { if (mode !== 'charge') lob = altDown && !actionDown; mode = 'charge'; charge = Math.min(1, charge + dt / 0.85); }
     else if (mode === 'charge') throwIt();
   } else mode = 'idle';
 
@@ -568,6 +573,15 @@ function updateStory(dt) {
     el.jarFill.style.width = (story.jar / story.goal * 100) + '%'; el.jarNum.textContent = `$${Math.floor(story.jar).toLocaleString()} / $${story.goal.toLocaleString()}`;
     el.clock.classList.toggle('hot', story.phase !== 'night');
   }
+  // happy hour comes round every few minutes
+  if (story.phase !== 'lastcall' && seenRange) {
+    happyNext -= dt;
+    if (happyNext <= 0 && happyT <= 0) { happyT = 40; happyNext = 200 + Math.random() * 80; W.happy = true; audio.bell(); toast('HAPPY HOUR'); sayQ.push(['sal', 'HAPPY HOUR! Forty seconds! Drinks are free and everything pays double!']); }
+  }
+  if (happyT > 0) {
+    happyT -= dt; el.clock.textContent = 'HAPPY HOUR ' + Math.ceil(happyT); el.clock.classList.add('hot');
+    if (happyT <= 0) { W.happy = false; story.dirty = true; sayQ.push(['sal', "Happy hour's over. Back to regular chaos."]); }
+  }
   // restroom: your reflection, and relief
   const rr = W.restroom;
   if (rr.inside(P.pos)) {
@@ -591,7 +605,7 @@ function updateHints(dt) {
   else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>`;
   else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order a drink';
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
-  else if (h && inRange()) p = mode === 'charge' ? 'release to throw' : '<kbd>hold click</kbd> wind up · release to throw';
+  else if (h && inRange()) p = mode === 'charge' ? (lob ? 'release to lob' : 'release to throw') : '<kbd>hold click</kbd> fastball · <kbd>hold right-click</kbd> lob';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
   else if (P.pos.z > 10.3) p = '<kbd>W A S D</kbd> walk in';
   else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? 'out of ammo — back to the bar' : 'belly up to the bar';
@@ -630,5 +644,5 @@ $('#loading')?.remove(); $('#start').disabled = false;
 // handy for poking at the game from the console
 window.game = { P, D, G, tray, order, W, range, audio, shots, story, interact, DG, get mode() { return mode; }, get dlg() { return dlg; }, get talkTo() { return talkTo; },
   tp(x, z, yaw = P.yaw, pitch = P.pitch) { P.pos.set(x, 0, z); P.yaw = yaw; P.pitch = pitch; },
-  press(v) { actionDown = v; }, get bladder() { return bladder; }, set bladder(v) { bladder = v; },
+  press(v) { actionDown = v; }, alt(v) { altDown = v; }, set happyNext(v) { happyNext = v; }, get bladder() { return bladder; }, set bladder(v) { bladder = v; },
   run(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); composer.render(); }, };

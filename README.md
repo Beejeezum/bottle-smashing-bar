@@ -20,9 +20,13 @@ Then visit http://localhost:8765. It needs an internet connection, because Three
 
 ## Controls
 
+Press `H` in the game for the full list.
+
 - `W A S D` walk, `Shift` hustle, mouse to look
-- `E` at the bar to order (number keys pick a drink), or facing a regular to talk
+- `E` order at the bar, talk to whoever you are facing, use the jukebox or the restroom
 - Hold click (or `F` / `Space`) to drink; with an empty in the range, hold to wind up and release to throw
+- Hold right-click (or `G`) to lob instead; release in the green for a perfect throw
+- `Q` swap drink, `C` cheers, `T` tip Sal, `X` pretzels, `R` restock the range, `B` Doug's Sixty
 - If mouse-look does not lock, hold right-click and drag, or use the arrow keys
 
 ## How it's made
@@ -37,4 +41,5 @@ There are no image, model or audio files.
 - `js/fx.js` handles shards, sparks, score pop-ups and the drunk-vision shader
 - `js/audio.js` synthesizes every sound and the jukebox with the Web Audio API
 - `js/story.js` holds the cast, their dares, the perks and the finale
+- `js/restroom.js` builds the restroom and its trick mirror
 - `js/main.js` is the game loop, controls and HUD

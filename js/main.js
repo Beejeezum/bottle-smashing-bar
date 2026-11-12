@@ -472,6 +472,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyE') interact();
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (e.code === 'KeyG') altDown = true;
+  if (e.code === 'KeyH') $('#help').classList.toggle('on');
   if (e.code === 'KeyC') cheers();
   if (e.code === 'KeyB' && inRange() && frenzyT <= 0 && story.phase !== 'lastcall') {
     if (time < frenzyCool) say('doug', 'Give me a second to restack.');

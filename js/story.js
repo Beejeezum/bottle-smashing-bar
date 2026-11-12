@@ -63,6 +63,14 @@ export class Story {
     this.perks = new Set(); this.jar = 0; this.goal = 1500; this.phase = 'night'; this.met = new Set(); this.left = 5; this.dirty = true; this.night = 1; this.fines = 0;
   }
   has(p) { return this.perks.has(p); }
+  dump() { const q = {}; for (const k in this.q) q[k] = [this.q[k].state, this.q[k].n]; return { q, perks: [...this.perks], jar: this.jar, night: this.night, phase: this.phase, met: [...this.met], fines: this.fines, goal: this.goal }; }
+  restore(d) {
+    for (const k in d.q) if (this.q[k]) { this.q[k].state = d.q[k][0]; this.q[k].n = d.q[k][1]; }
+    this.perks = new Set(d.perks); this.met = new Set(d.met); this.night = d.night; this.goal = d.goal; this.fines = d.fines || 0; this.phase = d.phase; this.jar = d.jar;
+    if (this.phase === 'lastcall') { this.phase = 'night'; this.jar = this.goal - 15; this.left = 5; } // replay the finale
+    if (this.phase === 'saved') this.left = 0;
+    this.dirty = true;
+  }
   quest(who) { return Object.values(this.q).find(q => q.d.who.includes(who)); }
   marker(who) {
     if (who === 'lou') return !this.met.has('lou');

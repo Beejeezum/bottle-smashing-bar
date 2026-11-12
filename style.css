@@ -142,3 +142,7 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 18px; }
 #help dt { color: var(--amber); white-space: nowrap; } #help dd { font-family: system-ui, sans-serif; letter-spacing: 0; font-size: 14px; align-self: center; opacity: .9; }
 #help p { text-align: center; font-size: 14px; opacity: .55; margin-top: 10px; }
+
+#fresh { margin-top: 14px; font: inherit; font-size: 16px; color: #fff; opacity: .6; background: none; border: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
+#fresh:hover { opacity: 1; }
+#settings { flex-wrap: wrap; justify-content: center; }

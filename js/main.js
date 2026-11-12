@@ -79,7 +79,7 @@ let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
 let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
 let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
-let nightFade = false;
+let nightFade = false, woozy = 1, hic = 0, slowFor = 0, saveT = 5;
 let happyT = 0, happyNext = 140, altDown = false, lob = false;
 let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
 const nearJuke = () => Math.hypot(P.pos.x + 6.9, P.pos.z + 1.5) < 1.5;
@@ -297,6 +297,19 @@ function nightTwo() {
   sayQ.push(['', 'The next evening. The sign is still buzzing.'], ['sal', "Bad news. Pemberton's cousin is a health inspector. He's in the range, reading the rules."], ['sal', "Jar needs $2,500 for the 'permit'. Throw all you like. Just not while he's LOOKING."]);
 }
 
+// pick up where you left off
+try {
+  const sv = JSON.parse(localStorage.getItem('bsb-save') || 'null');
+  if (sv && sv.s && sv.s.met.length) {
+    story.restore(sv.s); G.score = sv.score || 0; G.tab = sv.tab || 0; G.smashed = sv.smashed || 0;
+    $('#start').textContent = 'WALK BACK IN'; $('#fresh').hidden = false;
+    if (story.phase === 'saved' || story.night === 2) { pem.group.visible = true; pem.pose = 'seated'; pem.group.position.set(-3.6, 0, -4.1); pem.group.rotation.y = Math.PI; W.colliders.push({ x0: -3.9, x1: -3.3, z0: -4.75, z1: -3.85 }); }
+    if (story.night === 2) { insp.group.visible = true; if (story.phase === 'night') { IN.on = true; W.colliders.push({ x0: 10.6, x1: 11.2, z0: -9.6, z1: -9.0 }); } else { insp.group.position.set(6.8, 0, -3.6); } }
+    if (sv.gp) { gpMoved = true; W.npc.gus.group.position.set(11.5, 0, 4.2); W.npc.gus.group.rotation.y = Math.PI / 2; W.npc.pearl.group.position.set(11.5, 0, 5.4); W.npc.pearl.group.rotation.y = Math.PI / 2; }
+  }
+} catch (e) { }
+$('#fresh').addEventListener('click', () => { try { localStorage.removeItem('bsb-save'); } catch (e) { } location.reload(); });
+
 // Doug sweeps the range. Aim away from Doug.
 const doug = new NeonFigure({ color: 0xff7a2a, pose: 'chat', hat: 'cap', phase: 1 });
 doug.group.position.set(15.3, 0, -9.7); doug.group.rotation.y = -Math.PI / 2; scene.add(doug.group); W.figures.push(doug);
@@ -415,7 +428,9 @@ $('#start').addEventListener('click', () => {
   audio.init(); started = true; $('#title').classList.remove('on'); el.hud.classList.add('on'); lock(); drawTray(); hudNumbers();
   setTimeout(() => say('', 'Somewhere inside, glass is breaking. It sounds wonderful.', 4), 600);
 });
-const sensEl = $('#sens'), volEl = $('#vol');
+const sensEl = $('#sens'), volEl = $('#vol'), wooEl = $('#woozy');
+woozy = localStorage.getItem('bsb-woozy') === null ? 1 : store.get('bsb-woozy'); wooEl.value = woozy;
+wooEl.addEventListener('input', () => { woozy = +wooEl.value; store.set('bsb-woozy', woozy); });
 sens = store.get('bsb-sens') || 1; sensEl.value = sens; volEl.value = store.get('bsb-vol') || 0.85;
 sensEl.addEventListener('input', () => { sens = +sensEl.value; store.set('bsb-sens', sens); });
 volEl.addEventListener('input', () => { store.set('bsb-vol', volEl.value); if (audio.ready) audio.master.gain.value = +volEl.value; });
@@ -632,12 +647,13 @@ function updatePlayer(dt) {
   P.bob += speed * dt * 1.9;
   const si = Math.floor(P.bob / Math.PI);
   if (si !== stepI) { stepI = si; if (speed > 1.2) audio.step(P.pos.x < 8.2 && P.pos.z < 10.2, 0.7 + Math.random() * 0.5); }
-  const A = Math.pow(d, 1.4) * 0.11 * steady;
+  const A = Math.pow(d, 1.4) * 0.11 * steady * (0.35 + 0.65 * woozy);
   const sy = (Math.sin(time * 0.83) * 0.6 + Math.sin(time * 1.9 + 1.3) * 0.4) * A;
   const spt = (Math.sin(time * 1.07 + 2) * 0.6 + Math.sin(time * 2.3) * 0.4) * A * 0.7;
   camera.position.set(P.pos.x, 1.66 + Math.sin(P.bob * 2) * 0.035 * Math.min(1, speed / 4) + Math.sin(time * 0.9) * 0.03 * d, P.pos.z);
   if (bladder >= 1) camera.position.y += Math.abs(Math.sin(time * 7)) * 0.035; // the dance
-  camera.rotation.set(P.pitch + spt + sipTilt + (bladder >= 1 ? Math.sin(time * 9) * 0.012 : 0) + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
+  hic *= Math.exp(-dt * 6);
+  camera.rotation.set(P.pitch + hic + spt + sipTilt + (bladder >= 1 ? Math.sin(time * 9) * 0.012 : 0) + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
   const fov = 72 + Math.sin(time * 0.5) * 4 * d + (keys.ShiftLeft && moving ? 3 : 0);
   if (Math.abs(fov - camera.fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
   camera.updateMatrixWorld();
@@ -715,7 +731,7 @@ function updateDrunk(dt) {
   el.buzzFill.style.width = (D.level * 10) + '%';
   el.mult.textContent = '×' + ((1 + D.level * 0.3) * (story.phase === 'saved' ? 2 : 1)).toFixed(1);
   el.hud.style.setProperty('--d', d.toFixed(3));
-  if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); P.pitch += 0.035; fx.kick = 0.4; } }
+  if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); hic = 0.05; fx.kick = 0.4; } }
   // too far: lights out, and you wake up back at the bar
   if (D.level >= 9.6 && blackT <= 0 && !nightFade) { blackT = 3.4; blackouts++; headline('PATRON NAPS ON COUNTER, MID-THROW'); say('', 'The room folds up like a card table.', 2.5); }
   if (blackT > 0) {
@@ -730,7 +746,7 @@ function updateDrunk(dt) {
   } else
   if (blinkP < 1) { blinkP = Math.min(1, blinkP + dt / blinkDur); el.lids.style.setProperty('--lid', Math.sin(blinkP * Math.PI).toFixed(3)); }
   else if (D.level > 5.5) { blinkT -= dt; if (blinkT <= 0) { blinkT = 4 + Math.random() * 6 - d * 3; blinkDur = 0.25 + d * 0.6; blinkP = 0; } }
-  U.uDrunk.value = d; U.uTime.value = time;
+  U.uDrunk.value = d * woozy; U.uTime.value = time;
   U.uHit.value = Math.max(0, U.uHit.value - dt * 5);
   bloom.strength = 0.6 + d * 0.5;
 }
@@ -820,6 +836,12 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   slow -= dt;
+  // if the machine is struggling, quietly drop the render resolution
+  if (started && !paused && document.visibilityState === 'visible') {
+    slowFor = dt > 1 / 36 ? slowFor + dt : Math.max(0, slowFor - dt * 2);
+    if (slowFor > 4 && renderer.getPixelRatio() > 0.7) { const pr = renderer.getPixelRatio() > 1 ? 1 : 0.7; renderer.setPixelRatio(pr); composer.setPixelRatio(pr); composer.setSize(innerWidth, innerHeight); slowFor = 0; }
+    saveT -= dt; if (saveT <= 0) { saveT = 5; try { localStorage.setItem('bsb-save', JSON.stringify({ s: story.dump(), score: G.score, tab: G.tab, smashed: G.smashed, gp: gpMoved })); } catch (e) { } }
+  }
   tick(slow > 0 ? dt * 0.22 : dt);
   composer.render();
 }

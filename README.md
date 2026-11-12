@@ -4,6 +4,10 @@ A first-person browser game. Walk into a dive bar, order a drink, finish it, the
 
 The drunker you get, the harder it is to aim and the more every smash is worth.
 
+There is a story too: the landlord locks the doors at 2 a.m. unless the jar is full, and the regulars will dare you to help fill it. See [DESIGN.md](DESIGN.md).
+
+Play it: https://beejeezum.github.io/bottle-smashing-bar/
+
 ## Play
 
 It is a static site with no build step. Serve the folder and open it:
@@ -17,7 +21,7 @@ Then visit http://localhost:8765. It needs an internet connection, because Three
 ## Controls
 
 - `W A S D` walk, `Shift` hustle, mouse to look
-- `E` at the bar to order (number keys pick a drink)
+- `E` at the bar to order (number keys pick a drink), or facing a regular to talk
 - Hold click (or `F` / `Space`) to drink; with an empty in the range, hold to wind up and release to throw
 - If mouse-look does not lock, hold right-click and drag, or use the arrow keys
 
@@ -32,4 +36,5 @@ There are no image, model or audio files.
 - `js/targets.js` builds the Smash Range and everything breakable in it
 - `js/fx.js` handles shards, sparks, score pop-ups and the drunk-vision shader
 - `js/audio.js` synthesizes every sound and the jukebox with the Web Audio API
+- `js/story.js` holds the cast, their dares, the perks and the finale
 - `js/main.js` is the game loop, controls and HUD

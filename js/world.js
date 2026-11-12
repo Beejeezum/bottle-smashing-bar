@@ -6,7 +6,7 @@ import { NeonFigure } from './people.js';
 import { DRINKS, makeVessel, vesselGeo } from './drinks.js';
 
 export function buildWorld(scene) {
-  const W = { colliders: [], statics: [], ticks: [], flicker: [], figures: [] };
+  const W = { colliders: [], statics: [], ticks: [], flicker: [], figures: [], npc: {} };
   const col = (x0, x1, z0, z1) => W.colliders.push({ x0, x1, z0, z1 });
 
   const M = (canvas, rx, ry, o = {}) => new THREE.MeshStandardMaterial({
@@ -119,16 +119,16 @@ export function buildWorld(scene) {
   const vinyl = flat(0x8a1420, { r: 0.35 });
   const stoolX = [-6.6, -5.1, -3.6, -2.1, -0.6, 0.9, 2.4, 3.9];
   stoolX.forEach(x => { cyl(0.2, 0.2, 0.07, vinyl, x, 0.79, -4.1); cyl(0.03, 0.03, 0.76, chrome, x, 0.38, -4.1, 8); cyl(0.2, 0.22, 0.03, chrome, x, 0.015, -4.1); });
-  const regulars = [[0, 0xff2d95, 'cowboy', 'lager'], [1, 0x00e5ff, 'bun', 'martini'], [3, 0xffe600, null, 'stout'], [6, 0xb26bff, 'mohawk', 'whiskey']];
-  regulars.forEach(([si, color, hat, drink], i) => {
+  const regulars = [[0, 0xff2d95, 'cowboy', 'lager', 'tex'], [1, 0x00e5ff, 'bun', 'martini', 'dol'], [3, 0xffe600, null, 'stout', 'hank'], [6, 0xb26bff, 'mohawk', 'whiskey', 'riv']];
+  regulars.forEach(([si, color, hat, drink, id], i) => {
     const f = new NeonFigure({ color, hat, pose: 'seated', phase: i * 2.7 });
     f.group.position.set(stoolX[si], 0, -4.1); f.group.rotation.y = Math.PI; scene.add(f.group);
     f.hold(makeVessel(DRINKS.find(d => d.id === drink), 0.6));
-    W.figures.push(f); col(stoolX[si] - 0.3, stoolX[si] + 0.3, -4.75, -3.85);
+    W.npc[id] = f; W.figures.push(f); col(stoolX[si] - 0.3, stoolX[si] + 0.3, -4.75, -3.85);
     const spare = makeVessel(DRINKS[i % 3], 0.3); spare.position.set(stoolX[si] - 0.35, 1.09, -5.05); scene.add(spare);
   });
   const tender = W.bartender = new NeonFigure({ color: 0xfff0c4, pose: 'bartender', hat: 'bow', boost: 1.7 });
-  tender.group.position.set(0.5, 0, -6.35); scene.add(tender.group); W.figures.push(tender);
+  tender.group.position.set(0.5, 0, -6.35); scene.add(tender.group); W.figures.push(tender); W.npc.sal = tender;
   // pendant lamps
   const shade = flat(0x123a2a, { r: 0.4, m: 0.3, side: THREE.DoubleSide });
   [-6, -3, 0, 3].forEach(x => {
@@ -147,7 +147,7 @@ export function buildWorld(scene) {
   const jl = new THREE.PointLight(0xff4fa0, 7, 8, 2); jl.position.set(-6.6, 1.4, -1.5); scene.add(jl);
   W.ticks.push(t => { jm.color.setHSL((t * 0.08) % 1, 0.5, 0.75).multiplyScalar(2.4); jl.color.setHSL((t * 0.08) % 1, 0.9, 0.6); });
   const dancer = new NeonFigure({ color: 0x9dff00, pose: 'dance', hat: 'halo' });
-  dancer.group.position.set(-5.9, 0, -0.9); dancer.group.rotation.y = Math.PI / 2 + 0.5; scene.add(dancer.group); W.figures.push(dancer);
+  dancer.group.position.set(-5.9, 0, -0.9); dancer.group.rotation.y = Math.PI / 2 + 0.5; scene.add(dancer.group); W.figures.push(dancer); W.npc.lime = dancer;
   col(-6.25, -5.55, -1.25, -0.55);
   // pool table
   const felt = flat(0x0f6a3c, { r: 1 });
@@ -165,7 +165,7 @@ export function buildWorld(scene) {
   cyl(0.45, 0.45, 0.05, M(cTop, 1, 1, { rough: 0.2, env: 1.2 }), 3.6, 1.06, 3.4); cyl(0.04, 0.04, 1.04, chrome, 3.6, 0.52, 3.4, 8); cyl(0.3, 0.32, 0.03, chrome, 3.6, 0.015, 3.4);
   [[2.85, 0xff8a00, Math.PI / 2, 'cap', 'ipa'], [4.35, 0xff5ad0, -Math.PI / 2, 'bun', 'wine']].forEach(([x, c, ry, hat, dr], i) => {
     const f = new NeonFigure({ color: c, pose: 'chat', phase: i * 1.9, hat }); f.group.position.set(x, 0, 3.4 + i * 0.1); f.group.rotation.y = ry; scene.add(f.group);
-    f.hold(makeVessel(DRINKS.find(d => d.id === dr), 0.5)); W.figures.push(f);
+    f.hold(makeVessel(DRINKS.find(d => d.id === dr), 0.5)); W.figures.push(f); W.npc[i ? 'pearl' : 'gus'] = f;
   });
   col(2.55, 4.65, 3.0, 3.9);
   // wall dressing

@@ -299,3 +299,32 @@ export function jukebox() {
   for (let i = 0; i < 5; i++) g.fillRect(98, 190 + i * 30, 60, 14);
   return c;
 }
+
+export function portrait() {
+  const [c, g] = mk(256, 358);
+  const bg = g.createLinearGradient(0, 0, 0, 358); bg.addColorStop(0, '#2a3a2c'); bg.addColorStop(1, '#101a14');
+  g.fillStyle = bg; g.fillRect(0, 0, 256, 358);
+  g.fillStyle = '#14161c'; g.beginPath(); g.ellipse(128, 372, 120, 110, 0, 0, 7); g.fill();          // suit
+  g.fillStyle = '#f2f2f2'; g.beginPath(); g.moveTo(108, 268); g.lineTo(148, 268); g.lineTo(128, 320); g.fill();
+  g.fillStyle = '#8a1420'; g.beginPath(); g.moveTo(120, 272); g.lineTo(136, 272); g.lineTo(128, 312); g.fill();
+  g.fillStyle = '#e6c2a0'; g.beginPath(); g.ellipse(128, 190, 58, 74, 0, 0, 7); g.fill();            // head
+  g.fillStyle = '#0c0c10'; g.fillRect(52, 112, 152, 14); g.fillRect(78, 22, 100, 96);                // top hat
+  g.fillStyle = '#8a1420'; g.fillRect(78, 96, 100, 12);
+  g.strokeStyle = '#2a1a10'; g.lineWidth = 5; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(88, 160); g.lineTo(116, 168); g.moveTo(140, 164); g.lineTo(170, 152); g.stroke(); // smug brows
+  g.fillStyle = '#1a1a1a'; g.beginPath(); g.arc(104, 182, 5, 0, 7); g.arc(154, 180, 5, 0, 7); g.fill();
+  g.strokeStyle = '#d9a520'; g.lineWidth = 4; g.beginPath(); g.arc(154, 180, 17, 0, 7); g.moveTo(168, 190); g.lineTo(178, 250); g.stroke(); // monocle
+  g.strokeStyle = '#3a2413'; g.lineWidth = 8; g.beginPath(); g.moveTo(92, 226); g.quadraticCurveTo(110, 208, 128, 222); g.quadraticCurveTo(146, 208, 164, 226); g.stroke();
+  g.strokeStyle = '#7a3a30'; g.lineWidth = 3; g.beginPath(); g.moveTo(116, 240); g.quadraticCurveTo(134, 246, 146, 236); g.stroke();
+  return c;
+}
+
+export function forsale() {
+  const [c, g] = mk(512, 336);
+  g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, 512, 336);
+  g.fillStyle = '#c0181f'; g.fillRect(0, 0, 512, 150);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '132px "Bebas Neue"'; g.fillText('FOR SALE', 256, 124);
+  g.fillStyle = '#14161c'; g.font = '52px "Bebas Neue"'; g.fillText('LUXURY CONDOS', 256, 212); g.fillText('COMING SOON', 256, 268);
+  g.font = '26px "Bebas Neue"'; g.fillStyle = '#c0181f'; g.fillText('PEMBERTON HOLDINGS', 256, 314);
+  return c;
+}

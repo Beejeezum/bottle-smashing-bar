@@ -45,6 +45,16 @@ const POSES = {
     j.knL.set(-0.12, 0.5, 0.03); j.knR.set(0.13, 0.5, 0.0);
     j.ftL.set(-0.14, 0.02, 0); j.ftR.set(0.15, 0.02, -0.03);
   },
+  walk(j, t, f) {
+    const b = t * 6, s = Math.sin(b), c = Math.cos(b);
+    j.hip.set(0, 0.95 + Math.abs(c) * 0.02, 0); j.chest.set(0, 1.42, 0.06); j.head.set(0, 1.71, 0.1);
+    j.shL.set(-0.2, 1.46, 0.05); j.shR.set(0.2, 1.46, 0.05);
+    j.elL.set(-0.26, 1.2, 0.05 - s * 0.12); j.haL.set(-0.24, 1.0, 0.12 - s * 0.25);
+    j.elR.set(0.3, 1.2, 0.2); j.haR.set(0.22, 1.05, 0.42);
+    j.hpL.set(-0.1, 0.95, 0); j.hpR.set(0.1, 0.95, 0);
+    j.knL.set(-0.11, 0.5 + Math.max(0, c) * 0.08, s * 0.18 + 0.04); j.knR.set(0.11, 0.5 + Math.max(0, -c) * 0.08, -s * 0.18 + 0.04);
+    j.ftL.set(-0.12, 0.02 + Math.max(0, c) * 0.1, s * 0.28); j.ftR.set(0.12, 0.02 + Math.max(0, -c) * 0.1, -s * 0.28);
+  },
   dance(j, t, f) {
     const b = t * 5.4, sx = Math.sin(b) * 0.09, up = Math.abs(Math.sin(b)) * 0.05;
     j.hip.set(sx, 0.93 + up, 0); j.chest.set(-sx * 0.6, 1.4 + up, 0); j.head.set(-sx * 1.2, 1.7 + up, 0.03);
@@ -77,6 +87,11 @@ export class NeonFigure {
     head.add(eL, eR, smile);
     const tor = (r, x, y, z, rx = Math.PI / 2) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, 0.012, 6, 24), mat); m.position.set(x, y, z); m.rotation.x = rx; head.add(m); };
     if (hat === 'cowboy') { tor(0.19, 0, 0.1, 0); tor(0.09, 0, 0.17, 0); }
+    if (hat === 'top') {
+      tor(0.16, 0, 0.1, 0); tor(0.09, 0, 0.12, 0); tor(0.09, 0, 0.32, 0);
+      [-1, 1].forEach(s => { const m = new THREE.Mesh(TUBE, mat); m.scale.y = 0.2; m.position.set(s * 0.09, 0.22, 0); head.add(m); });
+    }
+    if (hat === 'cap') { tor(0.105, 0, 0.07, 0); tor(0.06, 0, 0.07, 0.13); }
     if (hat === 'bun') tor(0.045, 0, 0.14, -0.04, 0);
     if (hat === 'halo') tor(0.09, 0, 0.19, 0);
     if (hat === 'mohawk') for (let i = 0; i < 5; i++) {

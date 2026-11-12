@@ -9,7 +9,9 @@ import { buildWorld } from './world.js';
 import { Range } from './targets.js';
 import { FX, DrunkShader } from './fx.js';
 import { AudioSys } from './audio.js';
-import { DRINKS, makeVessel } from './drinks.js';
+import { DRINKS, VESSELS, makeVessel } from './drinks.js';
+import { NeonFigure } from './people.js';
+import { Story, CAST, DOUG } from './story.js';
 
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -64,9 +66,10 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
+const U = drunkPass.uniforms;
 
 // ---------- state ----------
-const P = { pos: new THREE.Vector3(0, 0, 14.6), vel: new THREE.Vector3(), yaw: 0, pitch: 0.06, bob: 0 };
+const P = { pos: new THREE.Vector3(0, 0, 14.6), vel: new THREE.Vector3(), yaw: 0, pitch: 0.06, bob: 0, lvx: 0, lvy: 0 };
 const D = { level: 0, pending: 0 };
 const G = { score: 0, smashed: 0, streak: 0, best: 0, tab: 0, thrown: 0 };
 const tray = [];            // drinks in hand, [0] is the one you're holding
@@ -74,24 +77,23 @@ const shots = [];           // bottles in flight
 const keys = {};
 let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
-let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0;
+let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
+let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0;
 const d01 = () => clamp(D.level / 9, 0, 1);
 
-const hand = new THREE.Group(); camera.add(hand);
-const handLight = new THREE.PointLight(0xffe0c0, 0.5, 3, 2); handLight.position.set(0.1, 0, -0.1); camera.add(handLight);
-const ARC_N = 34;
-const arcGeo = new THREE.BufferGeometry(); arcGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_N * 3), 3));
-const arc = new THREE.Points(arcGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 4, sizeAttenuation: false, transparent: true, opacity: 0.8, depthWrite: false }));
-arc.frustumCulled = false; arc.visible = false; scene.add(arc);
-
 // ---------- HUD ----------
-const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross') };
-let subT = 0, toastT = 0, promptText = '';
-function say(who, text, dur = 3.2) { el.sub.innerHTML = `<i>${who}</i> ${text}`; el.sub.classList.add('on'); subT = dur; }
-function toast(text, dur = 2.2) { el.toast.textContent = text; el.toast.classList.remove('on'); void el.toast.offsetWidth; el.toast.classList.add('on'); toastT = dur; }
+const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross'), clock: $('#clock'), jarFill: $('#jar-fill'), jarNum: $('#jar-num'), quests: $('#quests'), lids: $('#lids') };
+let subT = 0, promptText = '', dlg = null;
+const sayQ = [];
+function say(who, text, dur = 3.2) {
+  if (dlg) return;
+  const c = CAST[who] ?? CAST[''];
+  el.sub.innerHTML = `<i style="color:${c.color}">${c.name}</i> ${text}`; el.sub.classList.add('on'); subT = dur;
+}
+function toast(text) { el.toast.textContent = text; el.toast.classList.remove('on'); void el.toast.offsetWidth; el.toast.classList.add('on'); }
 function setPrompt(t) { if (t !== promptText) { promptText = t; el.prompt.innerHTML = t; el.prompt.classList.toggle('on', !!t); } }
 function drawTray() {
-  el.tray.innerHTML = tray.map((h, i) => `<div class="slot${i ? '' : ' cur'}"><span>${h.drink.name.replace(/ ×5$/, '')}</span><em style="--f:${h.fill}"></em></div>`).join('') || '<div class="slot empty"><span>empty-handed</span></div>';
+  el.tray.innerHTML = tray.slice(0, 6).map((h, i) => `<div class="slot${i ? '' : ' cur'}"><span>${h.drink.name.replace(/ ×5$/, '')}</span><em style="--f:${h.fill}"></em></div>`).join('') + (tray.length > 6 ? `<div class="slot">+${tray.length - 6} more</div>` : '') || '<div class="slot empty"><span>empty-handed</span></div>';
 }
 function hudNumbers() {
   el.score.textContent = G.score.toLocaleString();
@@ -100,35 +102,155 @@ function hudNumbers() {
 }
 const LEVELS = [[0, 'STONE SOBER'], [0.6, 'WARMED UP'], [2, 'BUZZED'], [3.5, 'TIPSY'], [5, 'SLOPPY'], [6.5, 'HAMMERED'], [8, 'ABSOLUTELY COOKED']];
 
-// menu
+// dialogue: a short stack of lines you step through with E
+function startDlg(lines, after) {
+  if (!lines?.length) { after?.(); return; }
+  if (menuOpen) openMenu(false);
+  dlg = { lines, i: 0, after, x: P.pos.x, z: P.pos.z }; showDlg();
+}
+function showDlg() {
+  const [who, text] = dlg.lines[dlg.i], c = CAST[who];
+  el.sub.innerHTML = `<i style="color:${c.color}">${c.name}</i> ${text} <kbd class="next">E</kbd>`; el.sub.classList.add('on'); subT = 1e9;
+  audio.tick(480 + (who.charCodeAt(0) % 7) * 40);
+}
+function advDlg(cancel) {
+  if (!cancel && ++dlg.i < dlg.lines.length) return showDlg();
+  const a = dlg.after; dlg = null; subT = 0.01; if (!cancel) a?.();
+}
+
+// ---------- story ----------
+const story = new Story({
+  say, toast, queue: lines => sayQ.push(...lines),
+  lastCall() {
+    audio.bell(); toast('LAST CALL'); range.startFinale();
+    pem.group.visible = true; W.colliders.push({ x0: 10.9, x1: 11.5, z0: 8.2, z1: 8.8 });
+    sayQ.push(['sal', "LAST CALL! Jar's full, Pemberton! But, uh... the range is still open."], ['pem', 'I had my collection brought in for the lobby. Nobody TOUCH anything.'], ['doug', "They're on the red pedestals. Just saying."]);
+  },
+  saved() {
+    G.score += 5000; hudNumbers(); partyT = 6;
+    setTimeout(() => { toast('THE BAR IS SAVED'); audio.cheer(1); audio.bell(); }, 900);
+    sayQ.push(['pem', "Enough! ENOUGH. Keep your wretched bar. I'm going into parking lots."], ['sal', "Bar's staying open, everybody! Next round's on the jar!"], ['', 'After hours now. Everything you break pays double.']);
+  },
+});
+let partyT = 0;
+
+// markers above anyone with something to say
+const markTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.font = '60px "Bebas Neue"'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = '#ffb300'; g.shadowBlur = 10; g.fillStyle = '#ffe9a0'; g.fillText('!', 32, 36);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const pem = new NeonFigure({ color: 0xc8ffd8, pose: 'chat', hat: 'top', phase: 3, boost: 1.4 });
+pem.group.position.set(11.2, 0, 8.5); pem.group.rotation.y = Math.PI * 0.85; pem.group.visible = false; scene.add(pem.group); W.figures.push(pem); W.npc.pem = pem;
+const marks = {};
+for (const id in W.npc) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTex, depthWrite: false })); s.material.color.setScalar(2);
+  s.scale.setScalar(0.3); W.npc[id].group.add(s); marks[id] = s;
+}
+
+// Doug sweeps the range. Aim away from Doug.
+const doug = new NeonFigure({ color: 0xff7a2a, pose: 'chat', hat: 'cap', phase: 1 });
+doug.group.position.set(15.3, 0, -9.7); doug.group.rotation.y = -Math.PI / 2; scene.add(doug.group); W.figures.push(doug);
+{
+  const broom = new THREE.Group(), m = doug.mat;
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.3, 6), m); stick.position.y = -0.35; broom.add(stick);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.05), m); head.position.y = -1.0; broom.add(head);
+  doug.hold(broom);
+}
+const DG = { mode: 'idle', t: 30, dir: 1 };
+function dougSay(kind, chance = 1) {
+  if (time < dougTalk || dlg || Math.random() > chance || P.pos.x < 8.5) return;
+  dougTalk = time + 9; say('doug', pick(DOUG[kind]));
+}
+function updateDoug(dt) {
+  const g = doug.group;
+  if (DG.mode === 'idle') {
+    DG.t -= dt;
+    if (DG.t <= 0 && P.pos.x > 9) { DG.mode = 'sweep'; doug.pose = 'walk'; g.rotation.y = DG.dir > 0 ? 0 : Math.PI; dougSay('sweep'); }
+  } else {
+    g.position.z += DG.dir * 1.5 * dt;
+    if (Math.abs(g.position.z) > 9.7) { g.position.z = 9.7 * DG.dir; DG.mode = 'idle'; doug.pose = 'chat'; g.rotation.y = -Math.PI / 2; DG.dir *= -1; DG.t = 40 + Math.random() * 40; }
+  }
+}
+
+// ---------- your hand ----------
+const hand = new THREE.Group(); camera.add(hand);
+const grip = new THREE.Group(); hand.add(grip);
+const gripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fd8ff).multiplyScalar(0.85) });
+const UP = new THREE.Vector3(0, 1, 0);
+function tube(a, b, r = 0.0065) {
+  const d = b.clone().sub(a), l = d.length(), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, 6), gripMat);
+  m.position.copy(a).addScaledVector(d, 0.5); m.quaternion.setFromUnitVectors(UP, d.normalize()); return m;
+}
+function buildGrip(v) {
+  grip.clear();
+  const [r, y] = VESSELS[v].grip, R = r + 0.008;
+  for (let i = 0; i < 4; i++) { // fingers wrap the far side
+    const m = new THREE.Mesh(new THREE.TorusGeometry(R, 0.0065, 6, 14, Math.PI * 1.1), gripMat);
+    m.rotation.x = -Math.PI / 2; m.position.y = y + (i - 1.5) * 0.0175; grip.add(m);
+  }
+  const th = new THREE.Mesh(new THREE.TorusGeometry(R, 0.0075, 6, 10, Math.PI * 0.5), gripMat); // thumb, near side
+  th.rotation.x = Math.PI / 2; th.position.y = y + 0.012; grip.add(th);
+  grip.add(tube(new THREE.Vector3(R, y - 0.03, 0), new THREE.Vector3(R, y + 0.03, 0)));
+  grip.add(tube(new THREE.Vector3(R + 0.005, y - 0.01, 0.01), new THREE.Vector3(0.2, -0.5, 0.34), 0.011));
+}
+const handLight = new THREE.PointLight(0xffe0c0, 0.25, 3, 2); handLight.position.set(0.1, 0, -0.1); camera.add(handLight);
+const ARC_N = 34;
+const arcGeo = new THREE.BufferGeometry(); arcGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_N * 3), 3));
+const arc = new THREE.Points(arcGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 4, sizeAttenuation: false, transparent: true, opacity: 0.8, depthWrite: false }));
+arc.frustumCulled = false; arc.visible = false; scene.add(arc);
+
+function equip() {
+  const h = tray[0];
+  for (const c of [...hand.children]) if (c !== grip) hand.remove(c);
+  grip.visible = !!h; if (!h) return;
+  h.mesh ??= makeVessel(h.drink, h.fill);
+  h.mesh.position.set(0, 0, 0); h.mesh.rotation.set(0, 0, 0); h.mesh.scale.setScalar(1);
+  hand.add(h.mesh); buildGrip(h.drink.vessel); handRise = 0;
+}
+
+// ---------- ordering: Sal pours it on the bar, you pick it up ----------
 el.list.innerHTML = DRINKS.map(d => `<li data-id="${d.id}"><kbd>${d.key}</kbd><div><b>${d.name}</b><small>${d.desc}</small></div><span class="pips">${d.strength < 0 ? '<u>sobering</u>' : '●'.repeat(Math.ceil(d.strength * (d.bundle || 1) / (d.bundle ? 2.5 : 1)))}</span><span class="price">${d.price ? '$' + d.price : 'free'}</span></li>`).join('');
 el.list.addEventListener('click', e => { const li = e.target.closest('li'); if (li) order(li.dataset.id); });
 function openMenu(v) { menuOpen = v; el.menu.classList.toggle('on', v); if (v) audio.tick(660); }
+const serveQ = [], waiting = []; let serving = null, served = 0;
+const cap = () => story.has('pockets') ? 9 : 6;
+const carrying = () => tray.length + serveQ.length + waiting.length + (serving ? 1 : 0);
 
-function order(id) {
+function order(id, free) {
   const d = DRINKS.find(x => x.id === id); if (!d) return;
   const n = d.bundle || 1;
-  if (tray.length + n > 6) { say('BARTENDER', pick(['Finish what you\'re holding first, champ.', 'You have two hands. I counted.', 'That\'s a lot of glass for one person.'])); audio.tick(220); return; }
-  W.bartender.serveT = 1.1; audio.pour(); G.tab += d.price;
+  if (carrying() + n > cap()) { say('sal', pick(["Finish what you're holding first, champ.", 'You have two hands. I counted.', "That's a lot of glass for one person."])); audio.tick(220); return; }
+  if (!free) G.tab += d.price;
   const li = el.list.querySelector(`[data-id="${id}"]`); li.classList.remove('hit'); void li.offsetWidth; li.classList.add('hit');
+  for (let i = 0; i < n; i++) serveQ.push({ d, fast: n > 1 });
   const k = d01();
-  say('BARTENDER', d.strength < 0 ? pick(['Smart. Boring, but smart.', 'Hydration. Bold strategy.'])
-    : k < 0.25 ? pick(['Coming right up.', 'Good choice.', 'One of those nights, huh?', 'Range is through there when you\'re done.'])
-      : k < 0.6 ? pick(['Pace yourself, slugger.', 'You\'re a natural. Allegedly.', 'The range is still that way. Roughly.'])
-        : pick(['I\'m legally required to keep serving you. It\'s a weird bar.', 'You\'re pointing at the menu with your whole body.', 'Sure. Why not. What could go wrong.']));
-  setTimeout(() => {
-    for (let i = 0; i < n; i++) tray.push({ drink: d, fill: 1, mesh: null });
-    if (tray.length === n) equip();
-    drawTray(); hudNumbers(); audio.tick(990);
-  }, 850);
+  if (!free) say('sal', d.strength < 0 ? pick(['Smart. Boring, but smart.', 'Hydration. Bold strategy.'])
+    : k < 0.25 ? pick(['Coming right up.', 'Good choice.', 'One of those nights, huh?', "Range is through there when you're done."])
+      : k < 0.6 ? pick(['Pace yourself, slugger.', "You're a natural. Allegedly.", 'The range is still that way. Roughly.'])
+        : pick(["I'm legally required to keep serving you. It's a weird bar.", "You're pointing at the menu with your whole body.", 'Sure. Why not. What could go wrong.']));
+  hudNumbers();
 }
-
-function equip() {
-  while (hand.children.length) hand.remove(hand.children[0]);
-  const h = tray[0]; if (!h) return;
-  h.mesh ??= makeVessel(h.drink, h.fill);
-  h.mesh.position.set(0, 0, 0); h.mesh.rotation.set(0, 0, 0); h.mesh.scale.setScalar(1);
-  hand.add(h.mesh); handRise = 0;
+function updateServe(dt) {
+  const b = W.bartender;
+  if (!serving && serveQ.length) {
+    const q = serveQ.shift(), m = makeVessel(q.d, 0);
+    m.position.set(clamp(b.group.position.x + 0.2 + ((served++ % 5) - 2) * 0.13, -7.4, 4), 1.092, -5.5); scene.add(m);
+    serving = { d: q.d, m, t: 0, dur: q.fast ? 0.3 : 0.75 }; b.serveT = serving.dur + 0.1; if (!q.fast || served % 2) audio.pour();
+  }
+  if (serving) {
+    const s = serving; s.t += dt;
+    s.m.userData.setFill(Math.min(1, s.t / s.dur));
+    if (s.t > s.dur) s.m.position.z = -5.5 + Math.min(1, (s.t - s.dur) / 0.25) * 0.52;
+    if (s.t > s.dur + 0.25) { waiting.push(s); serving = null; audio.tick(990); }
+  }
+  for (let i = waiting.length - 1; i >= 0; i--) {
+    const s = waiting[i];
+    if (Math.hypot(P.pos.x - s.m.position.x, P.pos.z - s.m.position.z) < 2.0 && tray.length < cap()) {
+      scene.remove(s.m); tray.push({ drink: s.d, fill: 1, mesh: s.m }); waiting.splice(i, 1);
+      if (tray.length === 1) equip(); drawTray(); audio.tick(1320);
+    }
+  }
 }
 
 // ---------- input ----------
@@ -146,17 +268,32 @@ $('#start').addEventListener('click', () => {
 $('#pause').addEventListener('click', () => { paused = false; $('#pause').classList.remove('on'); audio.init(); lock(); });
 addEventListener('mousemove', e => {
   if (!started || paused) return;
-  if (locked || (e.buttons & 2)) { P.yaw -= e.movementX * 0.0022; P.pitch = clamp(P.pitch - e.movementY * 0.0022, -1.4, 1.4); }
+  if (locked || (e.buttons & 2)) {
+    // sober: 1:1. drunk: part of every movement arrives late, so the view swims
+    const d = d01(), late = d * 0.6, s = 0.0022;
+    P.yaw -= e.movementX * s * (1 - late); P.pitch = clamp(P.pitch - e.movementY * s * (1 - late), -1.4, 1.4);
+    const rate = 9 - 6 * d; P.lvx -= e.movementX * s * late * rate; P.lvy -= e.movementY * s * late * rate;
+  }
 });
-canvas.addEventListener('mousedown', e => { if (!started) return; if (e.button === 0) { if (!locked && !noLock) lock(); actionDown = true; } });
+canvas.addEventListener('mousedown', e => { if (!started) return; if (e.button === 0) { if (!locked && !noLock) lock(); if (dlg) advDlg(); else actionDown = true; } });
 addEventListener('mouseup', e => { if (e.button === 0) actionDown = false; });
 addEventListener('contextmenu', e => e.preventDefault());
+
+let talkTo = null;
+function interact() {
+  if (dlg) return advDlg();
+  if (talkTo) return startDlg(story.talk(talkTo));
+  if (menuOpen) return openMenu(false);
+  if (!nearBar()) return;
+  if (!story.met.has('sal')) return startDlg(story.salIntro(), () => { order('lager', true); openMenu(true); });
+  startDlg(story.salClaim(), () => openMenu(true));
+}
 addEventListener('keydown', e => {
   if (e.repeat) return;
   keys[e.code] = true;
   if (!started || paused) return;
-  if (e.code === 'KeyE') { if (menuOpen) openMenu(false); else if (nearBar()) openMenu(true); }
-  if (e.code === 'KeyF' || e.code === 'Space') { actionDown = true; e.preventDefault(); }
+  if (e.code === 'KeyE') interact();
+  if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (menuOpen && /^Digit\d$/.test(e.code)) { const d = DRINKS.find(x => x.key === e.code.slice(5)); if (d) order(d.id); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyF' || e.code === 'Space') actionDown = false; });
@@ -180,8 +317,8 @@ const throwSpeed = c => 9 + 16 * c;
 
 function throwIt() {
   const h = tray.shift(); const d = d01();
-  const m = h.mesh; hand.remove(m);
-  throwOrigin(_o); aimDir(_dir, d * d * 0.14);
+  const m = h.mesh; hand.remove(m); grip.visible = false;
+  throwOrigin(_o); aimDir(_dir, d * d * 0.14 * (story.has('steady') ? 0.65 : 1));
   m.position.copy(_o); m.scale.setScalar(1.5); scene.add(m);
   const sp = throwSpeed(charge) * (1 + (Math.random() - 0.5) * 0.25 * d);
   shots.push({ mesh: m, pos: _o.clone(), vel: _dir.clone().multiplyScalar(sp), spin: new THREE.Vector3(-(8 + Math.random() * 8), Math.random() * 2, Math.random() * 3), hit: false, life: 6, color: h.drink.glass ?? 0xdfefff });
@@ -189,34 +326,39 @@ function throwIt() {
   setTimeout(() => { equip(); drawTray(); }, 280); drawTray();
 }
 
-function smashShot(s, point, scored) {
+function smashShot(s, point, target) {
   scene.remove(s.mesh); s.dead = true;
   fx.glassBurst(point, s.vel, s.color, 22, 0.045);
   audio.smash({ ...range.where(point), size: 0.8, pitch: 1.15 });
-  drunkPass.uniforms.uHit.value = 1;
-  if (!s.hit) { if (G.streak >= 3) toast('STREAK LOST'); G.streak = 0; hudNumbers(); }
+  U.uHit.value = 1;
+  if (target && story.has('shrapnel')) { curShot = s; for (const t of range.near(point, 0.75, target)) t.hit({ vel: s.vel, point: t.c }); curShot = null; }
+  if (!s.hit) { if (G.streak >= 3) toast('STREAK LOST'); G.streak = 0; hudNumbers(); dougSay('miss', 0.45); }
 }
 
 function updateShots(dt) {
-  const SUB = 3, h = dt / SUB;
+  const SUB = 3, h = dt / SUB, dg = doug.group.position;
   for (let i = shots.length - 1; i >= 0; i--) {
     const s = shots[i];
     for (let k = 0; k < SUB && !s.dead; k++) {
       _a.copy(s.pos);
       s.vel.y -= 9.8 * h; s.pos.addScaledVector(s.vel, h);
       const p = s.pos;
+      if (Math.hypot(p.x - dg.x, p.z - dg.z) < 0.4 && p.y < 1.9) { // rule three
+        s.hit = true; smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
+        fx.popup(p, '-250', 'RULE THREE', 'bad'); dougTalk = 0; dougSay('ow'); audio.thud(range.where(p)); break;
+      }
       const hit = range.sweep(_a, p, 0.1);
       if (hit) {
         _b.lerpVectors(_a, p, hit.k); curShot = s;
         const r = hit.target.hit({ vel: s.vel, point: _b }); curShot = null;
-        if (r === 'block') { smashShot(s, _b); break; }
+        if (r === 'block') { smashShot(s, _b, hit.target); break; }
       }
       let wall = p.y < 0.06 || p.y > 9.9 || p.x > 37.9 || p.z < -10.9 || p.z > 10.9;
       if (!wall && p.x < 8.3) {
         const inBar = p.x < 8 && p.z > -7.9 && p.z < 9.9 && p.x > -7.9 && p.y < 3.5;
         const door = p.z > -4 && p.z < 6 && p.y < 3.2;
         wall = !(inBar || door) || (inBar && p.z < -4.7 && p.y < 1.2);
-        if (inBar && time - yelled > 6) { yelled = time; say('BARTENDER', pick(['HEY! The range is THAT way!', 'Not in the bar! We just mopped! (We did not.)', 'DOUG. Doug, they\'re doing it again.'])); }
+        if (inBar && time - yelled > 6) { yelled = time; say('sal', pick(['HEY! The range is THAT way!', 'Not in the bar! We just mopped! (We did not.)', "DOUG. Doug, they're doing it again."])); }
       }
       if (!wall) for (const b of W.statics) if (b.distanceToPoint(p) < 0.08) { wall = true; break; }
       if (wall) { p.y = Math.max(p.y, 0.05); smashShot(s, p); }
@@ -230,24 +372,29 @@ function updateShots(dt) {
   }
 }
 
-range.onScore = (pts, label, pos) => {
+range.onScore = (pts, label, pos, t, killed) => {
   const s = curShot;
-  if (s && !s.hit) { s.hit = true; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) toast(`${G.streak} IN A ROW!`); }
-  const mult = (1 + D.level * 0.3) * (1 + 0.1 * Math.min(G.streak, 10));
+  if (s && !s.hit) { s.hit = true; G.streak++; G.best = Math.max(G.best, G.streak); if ([3, 5, 8, 12].includes(G.streak)) { toast(`${G.streak} IN A ROW!`); audio.cheer(0.6); } }
+  const mult = (1 + D.level * 0.3) * (1 + (story.has('olive') ? 0.2 : 0.1) * Math.min(G.streak, 10)) * (story.phase === 'saved' ? 2 : 1);
   const n = Math.max(5, Math.round(pts * mult / 5) * 5);
-  G.score += n; G.smashed++;
+  G.score += n; if (killed) G.smashed++;
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
-  drunkPass.uniforms.uHit.value = 1.5;
+  U.uHit.value = 1.5;
+  if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); }
+  story.addJar(n / 25);
+  story.event({ type: t.type, killed, level: D.level, streak: s ? G.streak : 0, x: t.home.x, chain: label === 'CHAIN', finale: !!t.o.finale });
   hudNumbers();
 };
 
 // ---------- per-frame ----------
 function updatePlayer(dt) {
-  const d = d01();
+  const d = d01(), steady = story.has('steady') ? 0.7 : 1;
   const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), look = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
-  P.yaw += turn * 1.9 * dt; P.pitch = clamp(P.pitch + look * 1.3 * dt, -1.4, 1.4);
+  P.yaw += turn * 1.9 * dt + P.lvx * dt; P.pitch = clamp(P.pitch + look * 1.3 * dt + P.lvy * dt, -1.4, 1.4);
+  const decay = Math.exp(-(9 - 6 * d) * dt); P.lvx *= decay; P.lvy *= decay;
   let ix = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), iz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-  if (menuOpen) { if (ix || iz) openMenu(false); }
+  if (dlg) ix = iz = 0;
+  if (menuOpen && (ix || iz)) openMenu(false);
   const moving = ix || iz;
   if (moving) { const l = Math.hypot(ix, iz); ix /= l; iz /= l; ix += Math.sin(time * 0.73) * d * 0.55 + Math.sin(time * 1.9) * d * 0.25; }
   const sp = keys.ShiftLeft ? 6.2 : 4.3;
@@ -255,6 +402,10 @@ function updatePlayer(dt) {
   const wx = (rx * ix + fxx * iz) * sp, wz = (rz * ix + fz * iz) * sp;
   const k = 1 - Math.exp(-dt * 12 / (1 + d * 4));
   P.vel.x += (wx - P.vel.x) * k; P.vel.z += (wz - P.vel.z) * k;
+  if (D.level > 5) { // the floor moves on its own now and then
+    lurchT -= dt;
+    if (lurchT <= 0) { lurchT = 3 + Math.random() * 7 - d * 2; const s = (Math.random() < 0.5 ? -1 : 1) * (1.5 + d * 2.5); P.vel.x += rx * s; P.vel.z += rz * s; fx.kick = 0.5; }
+  }
   P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
   const R = 0.36;
   for (let pass = 0; pass < 2; pass++) for (const c of W.colliders) {
@@ -268,52 +419,66 @@ function updatePlayer(dt) {
   }
   const speed = Math.hypot(P.vel.x, P.vel.z);
   P.bob += speed * dt * 1.9;
-  const A = Math.pow(d, 1.4) * 0.11;
+  const si = Math.floor(P.bob / Math.PI);
+  if (si !== stepI) { stepI = si; if (speed > 1.2) audio.step(P.pos.x < 8.2 && P.pos.z < 10.2, 0.7 + Math.random() * 0.5); }
+  const A = Math.pow(d, 1.4) * 0.11 * steady;
   const sy = (Math.sin(time * 0.83) * 0.6 + Math.sin(time * 1.9 + 1.3) * 0.4) * A;
   const spt = (Math.sin(time * 1.07 + 2) * 0.6 + Math.sin(time * 2.3) * 0.4) * A * 0.7;
   camera.position.set(P.pos.x, 1.66 + Math.sin(P.bob * 2) * 0.035 * Math.min(1, speed / 4) + Math.sin(time * 0.9) * 0.03 * d, P.pos.z);
-  camera.rotation.set(P.pitch + spt + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
+  camera.rotation.set(P.pitch + spt + sipTilt + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
   const fov = 72 + Math.sin(time * 0.5) * 4 * d + (keys.ShiftLeft && moving ? 3 : 0);
   if (Math.abs(fov - camera.fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
   camera.updateMatrixWorld();
 }
 
 const hp = new THREE.Vector3(), hr = new THREE.Vector3();
+function finishDrink(h) {
+  h.fill = 0; h.mesh?.userData.setFill(0); needRelease = true; mode = 'idle'; drawTray();
+  const d = d01(), st = h.drink.strength;
+  setTimeout(() => audio.ahh(), 150);
+  if (st >= 2) { U.uBurn.value = Math.min(1.6, st / 2.6); fx.kick = 1; if (st >= 2.6 || h.drink.id === 'tequila') setTimeout(() => audio.cough(), 350); }
+  else if (Math.random() < 0.3 + d * 0.4) setTimeout(() => audio.burp(), 700);
+  if (h.drink.id === 'special') say('', 'It tastes like a battery fell in love with a lime.', 3.5);
+  if (!inRange() && G.thrown === 0) say('', 'Empty. The Smash Range is through the big opening on the right.', 4);
+}
 function updateAction(dt) {
   const h = tray[0], d = d01();
   if (!actionDown) needRelease = false;
   if (!h) mode = 'idle';
   else if (h.fill > 0) {
-    if (actionDown && !menuOpen && !needRelease) {
+    if (actionDown && !menuOpen && !needRelease && !dlg) {
       mode = 'drink';
       const df = Math.min(h.fill, dt / h.drink.time);
       h.fill -= df; D.pending += h.drink.strength * df; h.mesh?.userData.setFill(h.fill);
       gulpT -= dt; if (gulpT <= 0) { audio.gulp(); gulpT = 0.32; }
-      if (h.fill <= 0.0001) {
-        h.fill = 0; h.mesh?.userData.setFill(0); needRelease = true; mode = 'idle'; drawTray();
-        if (Math.random() < 0.3 + d * 0.4) setTimeout(() => audio.burp(), 500);
-        if (!inRange() && G.thrown === 0) say('', 'Empty. The Smash Range is through the big opening on the right.', 4);
-      } else el.tray.querySelector('.cur em')?.style.setProperty('--f', h.fill);
+      if (h.fill <= 0.0001) finishDrink(h);
+      else el.tray.querySelector('.cur em')?.style.setProperty('--f', h.fill);
     } else mode = 'idle';
   } else if (inRange()) {
-    if (actionDown && !needRelease) { mode = 'charge'; charge = Math.min(1, charge + dt / 0.85); }
+    if (actionDown && !needRelease && !dlg) { mode = 'charge'; charge = Math.min(1, charge + dt / 0.85); }
     else if (mode === 'charge') throwIt();
   } else mode = 'idle';
+
+  // head tips back as the glass empties; the world dims behind it
+  const drinking = mode === 'drink';
+  sipTilt += ((drinking ? 0.1 + (1 - (h?.fill ?? 1)) * 0.22 : 0) - sipTilt) * Math.min(1, dt * 7);
+  U.uSip.value += ((drinking ? 1 : 0) - U.uSip.value) * Math.min(1, dt * 6);
+  U.uBurn.value = Math.max(0, U.uBurn.value - dt * 0.9);
 
   // view-model pose
   handRise = Math.min(1, handRise + dt * 4);
   const speed = Math.hypot(P.vel.x, P.vel.z);
-  if (mode === 'drink') { hp.set(0.06, -0.13, -0.3); hr.set(0.55 + (1 - (h?.fill ?? 0)) * 0.95, 0, 0.12); }
+  if (drinking) { hp.set(0.05, -0.12 - sipTilt * 0.1, -0.27); hr.set(0.6 + (1 - (h?.fill ?? 0)) * 0.9, 0, 0.1); }
   else if (mode === 'charge') { hp.set(0.34, -0.1 + charge * 0.16, -0.36 + charge * 0.16); hr.set(-0.3 - charge * 1.1, 0, -0.2); }
   else { hp.set(0.27, -0.27 + Math.sin(P.bob * 2) * 0.012 * Math.min(1, speed / 4), -0.5); hr.set(0, 0, 0); }
   hp.x += Math.sin(time * 1.3) * 0.02 * d; hp.y += Math.cos(time * 1.7) * 0.015 * d - (1 - handRise) * 0.4;
-  if (mode === 'charge') { hp.x += (Math.random() - 0.5) * 0.004 * charge; }
+  if (mode === 'charge') hp.x += (Math.random() - 0.5) * 0.004 * charge;
   const k = 1 - Math.exp(-dt * 13);
   hand.position.lerp(hp, k);
   hand.rotation.x += (hr.x - hand.rotation.x) * k; hand.rotation.z += (hr.z - hand.rotation.z) * k;
 
   // aim arc: generous when sober, fades out as you get drunk
-  const show = mode === 'charge' ? clamp(1 - d * 1.7, 0, 1) : 0;
+  const show = mode === 'charge' ? clamp(1 - d * (story.has('liver') ? 1.05 : 1.7), 0, 1) : 0;
   arc.visible = show > 0.02;
   if (arc.visible) {
     throwOrigin(_o); aimDir(_dir, 0).multiplyScalar(throwSpeed(charge));
@@ -332,28 +497,54 @@ function updateDrunk(dt) {
   let label = LEVELS[0][1]; for (const [v, l] of LEVELS) if (D.level >= v) label = l;
   if (label !== lastLabel) { if (lastLabel && LEVELS.findIndex(x => x[1] === label) > LEVELS.findIndex(x => x[1] === lastLabel)) toast(label); lastLabel = label; el.buzzLabel.textContent = label; }
   el.buzzFill.style.width = (D.level * 10) + '%';
-  el.mult.textContent = '×' + (1 + D.level * 0.3).toFixed(1);
+  el.mult.textContent = '×' + ((1 + D.level * 0.3) * (story.phase === 'saved' ? 2 : 1)).toFixed(1);
   el.hud.style.setProperty('--d', d.toFixed(3));
   if (D.level > 3) { hicT -= dt; if (hicT <= 0) { hicT = 5 + Math.random() * 12 - d * 3; audio.hiccup(); P.pitch += 0.035; fx.kick = 0.4; } }
-  drunkPass.uniforms.uDrunk.value = d; drunkPass.uniforms.uTime.value = time;
-  drunkPass.uniforms.uHit.value = Math.max(0, drunkPass.uniforms.uHit.value - dt * 5);
+  // heavy eyelids
+  if (blinkP < 1) { blinkP = Math.min(1, blinkP + dt / blinkDur); el.lids.style.setProperty('--lid', Math.sin(blinkP * Math.PI).toFixed(3)); }
+  else if (D.level > 5.5) { blinkT -= dt; if (blinkT <= 0) { blinkT = 4 + Math.random() * 6 - d * 3; blinkDur = 0.25 + d * 0.6; blinkP = 0; } }
+  U.uDrunk.value = d; U.uTime.value = time;
+  U.uHit.value = Math.max(0, U.uHit.value - dt * 5);
   bloom.strength = 0.6 + d * 0.5;
+}
+
+const _h = new THREE.Vector3();
+function updateStory(dt) {
+  // who are you looking at?
+  talkTo = null; let best = 0.9;
+  camera.getWorldDirection(_a);
+  for (const id in W.npc) {
+    const f = W.npc[id]; marks[id].visible = story.marker(id); marks[id].position.y = (id === 'pem' ? 2.35 : 2.0) + Math.sin(time * 3) * 0.04;
+    if (id === 'sal' || !f.group.visible) continue;
+    _h.copy(f.group.position); _h.y = 1.4; _h.sub(camera.position);
+    const dist = _h.length(); if (dist > 2.7) continue;
+    const dot = _h.normalize().dot(_a); if (dot > best) { best = dot; talkTo = id; }
+  }
+  if (dlg && Math.hypot(P.pos.x - dlg.x, P.pos.z - dlg.z) > 3) advDlg(true);
+  if (subT > 0 && subT < 1e8) { subT -= dt; if (subT <= 0) el.sub.classList.remove('on'); }
+  if (!dlg && subT <= 0 && sayQ.length) { const [w, t] = sayQ.shift(); say(w, t, 3.8); }
+  if (story.dirty) {
+    story.dirty = false; el.quests.innerHTML = story.tracker(); el.clock.textContent = story.clock();
+    el.jarFill.style.width = (story.jar / story.goal * 100) + '%'; el.jarNum.textContent = `$${Math.floor(story.jar).toLocaleString()} / $${story.goal.toLocaleString()}`;
+    el.clock.classList.toggle('hot', story.phase !== 'night');
+  }
+  if (partyT > 0) { partyT -= dt; if (Math.random() < dt * 14) { _c.set(P.pos.x + (Math.random() - 0.5) * 9, 3 + Math.random() * 2, P.pos.z + (Math.random() - 0.5) * 9); fx.confetti(_c, 14); } }
 }
 
 function updateHints(dt) {
   const h = tray[0];
   let p = '';
-  if (menuOpen) p = '';
-  else if (nearBar()) p = '<kbd>E</kbd> order a drink';
+  if (menuOpen || dlg) p = '';
+  else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>`;
+  else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order a drink';
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
   else if (h && inRange()) p = mode === 'charge' ? 'release to throw' : '<kbd>hold click</kbd> wind up · release to throw';
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
   else if (P.pos.z > 10.3) p = '<kbd>W A S D</kbd> walk in';
-  else p = inRange() ? 'out of ammo — back to the bar' : 'belly up to the bar';
+  else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? 'out of ammo — back to the bar' : 'belly up to the bar';
   setPrompt(p);
   if (menuOpen && !nearBar()) openMenu(false);
-  if (!seenRange && inRange()) { seenRange = true; toast('THE SMASH RANGE', 3); say('', 'Finish a drink. Hurl the empty. Everything back there is fair game.', 5); }
-  if (subT > 0) { subT -= dt; if (subT <= 0) el.sub.classList.remove('on'); }
+  if (!seenRange && inRange()) { seenRange = true; toast('THE SMASH RANGE'); say('', 'Finish a drink. Hurl the empty. Everything back there is fair game.', 5); }
   // the bartender drifts along the bar to wherever you're standing
   const b = W.bartender; b.serveT = Math.max(0, (b.serveT ?? 0) - dt);
   b.serve += ((b.serveT > 0 ? 1 : 0) - b.serve) * Math.min(1, dt * 8);
@@ -364,21 +555,25 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  tick(dt);
+  composer.render();
+}
+function tick(dt) {
   time += dt;
   W.update(time, dt);
   if (started && !paused) {
-    updatePlayer(dt); updateAction(dt); updateShots(dt); updateDrunk(dt); updateHints(dt);
+    updatePlayer(dt); updateServe(dt); updateAction(dt); updateDoug(dt); updateShots(dt); updateDrunk(dt); updateStory(dt); updateHints(dt);
     audio.setMix(d01(), smooth(7, 11, P.pos.x), smooth(9.6, 11.5, P.pos.z));
   } else if (!started) {
     camera.position.set(Math.sin(time * 0.2) * 0.6, 1.66, 15.2); camera.rotation.set(0.1, Math.sin(time * 0.15) * 0.04, 0);
   }
   range.update(dt, time); fx.update(dt);
-  composer.render();
 }
 requestAnimationFrame(frame);
 $('#loading')?.remove(); $('#start').disabled = false;
 
 // handy for poking at the game from the console
-window.game = { P, D, G, tray, order, W, range, audio, shots, get mode() { return mode; },
+window.game = { P, D, G, tray, order, W, range, audio, shots, story, interact, DG, get mode() { return mode; }, get dlg() { return dlg; }, get talkTo() { return talkTo; },
   tp(x, z, yaw = P.yaw, pitch = P.pitch) { P.pos.set(x, 0, z); P.yaw = yaw; P.pitch = pitch; },
-  press(v) { actionDown = v; }, };
+  press(v) { actionDown = v; },
+  run(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); composer.render(); }, };

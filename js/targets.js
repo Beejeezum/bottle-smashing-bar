@@ -14,6 +14,8 @@ const BLACK = S(0x111111, 0.3);
 const lathe = pts => new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), 20);
 const MILK = lathe([[0, 0], [.055, 0], [.06, .02], [.06, .16], [.03, .24], [.028, .3], [.034, .31], [.034, .32]]);
 const VASE = lathe([[0, 0], [.07, 0], [.12, .12], [.13, .22], [.07, .36], [.05, .42], [.08, .48]]);
+const TROPHY = lathe([[0, 0], [.1, 0], [.1, .03], [.03, .06], [.03, .18], [.13, .3], [.15, .46], [.13, .46], [.11, .32], [0, .2]]);
+const GOLD = new THREE.MeshStandardMaterial({ color: 0xd9a520, roughness: 0.22, metalness: 1, envMapIntensity: 2.2, side: THREE.DoubleSide });
 let tex = null;
 
 // Builders return { g, r, cy } with the origin at the base, facing local +Z.
@@ -123,6 +125,43 @@ const BUILD = {
     disc.castShadow = true; holder.add(disc);
     return { g, r: 0.72, cy: h, disc };
   },
+  trophy() {
+    const g = new THREE.Group();
+    P(g, TROPHY, GOLD, 0, 0, 0);
+    [-1, 1].forEach(s => { const h = P(g, new THREE.TorusGeometry(.06, .012, 6, 16), GOLD, s * .17, .36, 0); });
+    return { g, r: 0.26, cy: 0.26 };
+  },
+  portrait() {
+    const g = new THREE.Group();
+    P(g, BOX, GOLD, 0, .45, 0, .62, .82, .06);
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(.5, .7), tex.portraitMat); pic.position.set(0, .45, .034); g.add(pic);
+    P(g, BOX, S(0x3a2413, 0.7), 0, .2, -.12, .04, .5, .04).rotation.x = 0.4;
+    return { g, r: 0.42, cy: 0.45 };
+  },
+  cat() {
+    const g = new THREE.Group(), w = S(0xfbfbf6, 0.14, 0, { envMapIntensity: 1.5 }), red = S(0xd61f2c, 0.4);
+    P(g, SPH, w, 0, .17, 0, .14, .17, .13); P(g, SPH, w, 0, .42, 0, .12);
+    P(g, CONE, w, -.07, .55, 0, .04, .08, .04); P(g, CONE, w, .07, .55, 0, .04, .08, .04);
+    P(g, CYL, red, 0, .31, 0, .1, .03, .1); P(g, SPH, GOLD, 0, .2, .12, .05, .05, .02);
+    P(g, SPH, BLACK, -.045, .44, .105, .014); P(g, SPH, BLACK, .045, .44, .105, .014); P(g, SPH, red, 0, .4, .118, .012);
+    const arm = new THREE.Group(); arm.position.set(.14, .3, .05); g.add(arm);
+    P(arm, SPH, w, 0, .09, 0, .04, .1, .04);
+    return { g, r: 0.3, cy: 0.3, arm };
+  },
+  condo(o) {
+    const g = new THREE.Group();
+    const gm = new THREE.MeshStandardMaterial({ color: o.color, transparent: true, opacity: 0.75, roughness: 0.05, metalness: 0.3, envMapIntensity: 3 });
+    P(g, BOX, S(0x2a2f33, 0.5), 0, .02, 0, .5, .04, .5);
+    P(g, BOX, gm, 0, .34, 0, .28, .6, .28); P(g, BOX, gm, 0, .72, 0, .2, .16, .2);
+    for (let i = 0; i < 5; i++) { const m = P(g, BOX, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a0).multiplyScalar(1.6) }), 0, .12 + i * .11, 0, .285, .02, .285); m.castShadow = false; }
+    return { g, r: 0.36, cy: 0.4 };
+  },
+  forsale() {
+    const g = new THREE.Group();
+    P(g, BOX, S(0xf2f2f2, 0.6), 0, .28, 0, .04, .56, .04); P(g, BOX, S(0xf2f2f2, 0.6), 0, .68, 0, .66, .44, .03);
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(.64, .42), tex.forsaleMat); pic.position.set(0, .68, .017); g.add(pic);
+    return { g, r: 0.38, cy: 0.62 };
+  },
   toilet() {
     const g = new THREE.Group(), w = S(0xf2f4f5, 0.12, 0, { envMapIntensity: 1.5 });
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(.2, .12, .38, 20), w); bowl.position.set(0, .19, .08); bowl.castShadow = true; g.add(bowl);
@@ -147,6 +186,11 @@ const TYPES = {
   disco: { kind: 'disco', pts: 500, label: 'DISCO BALL', respawn: 30 },
   teddy: { kind: 'knock', pts: 90, label: 'TEDDY', snd: 'thud' },
   bullseye: { kind: 'spin', pts: 100, label: 'BULLSEYE' },
+  trophy: { kind: 'ceramic', pts: 1000, label: "PEMBERTON'S TROPHY", debris: [0xd9a520, 0xffe08a], coins: true },
+  portrait: { kind: 'ceramic', pts: 1000, label: 'THE PORTRAIT', debris: [0xd9a520, 0x5a3a20, 0xe8d8c0] },
+  cat: { kind: 'ceramic', pts: 1000, label: 'MR. WHISKERS', hp: 2, debris: [0xffffff, 0xd61f2c, 0xd9a520] },
+  condo: { kind: 'glass', pts: 1000, label: 'THE CONDO MODEL', hp: 2 },
+  forsale: { kind: 'ceramic', pts: 1000, label: 'FOR SALE SIGN', debris: [0xffffff, 0xd61f2c] },
   toilet: { kind: 'ceramic', pts: 400, label: 'THE THRONE', hp: 2, debris: [0xf2f4f5, 0xdfe4e8], big: true, respawn: 25 },
 };
 
@@ -162,6 +206,7 @@ class Target {
     this.deps = []; this.landY = o.landY ?? 0; this.ang = 0; this.angV = 0; this.spinV = 0; this.ph = Math.random() * 6;
     R.scene.add(this.g);
     this.reset(); this.pop = 1;
+    if (o.finale) { this.state = 'gone'; this.g.visible = false; }
   }
   reset() {
     this.state = 'alive'; this.hp = this.T.hp ?? 1; this.g.visible = true; this.pop = 0;
@@ -195,7 +240,7 @@ class Target {
         this.state = 'fall'; this.life = 5;
         this.v.copy(p.vel).multiplyScalar(0.3); this.v.y += 3.2; this.v.x += 1;
         this.w.set(rnd(-9, 9), rnd(-9, 9), rnd(-9, 9));
-        R.audio[T.snd](R.where(this.c)); R.score(this, T.pts, T.label);
+        R.audio[T.snd](R.where(this.c)); R.score(this, T.pts, T.label, true);
         if (this.type === 'teddy') R.fx.chunkBurst(this.c, p.vel, 0xf5f5f0, 8, 0.03);
         return 'block';
     }
@@ -213,6 +258,7 @@ class Target {
     const T = this.T, R = this.R, fx = R.fx, c = this.c, w = R.where(c);
     this.state = T.husk ? 'husk' : 'dead'; this.g.visible = !!T.husk;
     this.timer = (T.respawn ?? 13) + Math.random() * 5;
+    if (this.o.finale) { this.state = 'gone'; this.g.visible = false; }
     switch (T.kind) {
       case 'glass': fx.glassBurst(c, vel, this.o.color ?? 0xe8f0f2, 26, 0.055); R.audio.smash(w); break;
       case 'ceramic':
@@ -226,7 +272,7 @@ class Target {
       case 'disco': fx.glassBurst(c, vel, [0xffffff, 0xcfe0ff, 0xffd0f0], 110, 0.07); fx.sparks(c, [0xffffff, 0xff2d95, 0x00e5ff], 70, 9); R.audio.smash({ ...w, size: 2 }); R.audio.ding({ f: 1760, ...w }); break;
       case 'pinata': fx.confetti(c, 110); fx.chunkBurst(c, vel, [0xff2d95, 0xffe600, 0x00c2ff, 0x7cff3a, 0xff7a00], 36, 0.045); R.audio.pop(w); R.audio.coins(w); break;
     }
-    if (mult) R.score(this, T.pts * mult, label ?? T.label);
+    if (mult) R.score(this, T.pts * mult, label ?? T.label, true);
     for (const d of this.deps) if (d.state === 'alive') d.fall();
   }
   fall() {
@@ -235,6 +281,7 @@ class Target {
   }
   update(dt, t) {
     const g = this.g, o = this.o;
+    if (this.state === 'gone') return;
     if (this.state === 'dead' || this.state === 'husk') { this.timer -= dt; if (this.timer <= 0) this.reset(); return; }
     if (this.pop < 1) { this.pop = Math.min(1, this.pop + dt * 2.6); const k = this.pop, e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); g.scale.setScalar(this.s * e); }
     if (this.state === 'fall') {
@@ -259,6 +306,7 @@ class Target {
       this.b.piv.rotation.x = -this.ang; this.center();
     }
     else if (this.b.spinner) this.b.spinner.rotation.y += dt * 0.5;
+    else if (this.b.arm) this.b.arm.rotation.x = -0.5 + Math.sin(t * 5) * 0.5;
     else if (this.b.disc) { this.b.disc.rotation.y += this.spinV * dt; this.spinV *= Math.exp(-dt * 0.9); }
   }
 }
@@ -274,6 +322,8 @@ export class Range {
       melonMat: new THREE.MeshStandardMaterial({ map: TX.T(TX.melon(), 2, 1), roughness: 0.35 }),
       pinataMat: new THREE.MeshStandardMaterial({ map: TX.T(TX.stripes()), roughness: 0.9 }),
       bullMat: new THREE.MeshStandardMaterial({ map: TX.T(TX.bullseye()), roughness: 0.6 }),
+      portraitMat: new THREE.MeshStandardMaterial({ map: TX.T(TX.portrait()), roughness: 0.7 }),
+      forsaleMat: new THREE.MeshStandardMaterial({ map: TX.T(TX.forsale()), roughness: 0.7 }),
     };
     const { B, cyl, flat, M, canvases: C } = W;
     const wood = () => M(C.cDark, 1, 1, { rough: 0.7 }), crate = () => M(C.cTop, 1, 1, { rough: 0.85, color: 0xb89a70 });
@@ -327,6 +377,24 @@ export class Range {
     [-7, -5.6, -3.4, -2.4].forEach((z, i) => add(i % 2 ? 'vase' : 'piggy', 31, 2.08, z, { s: 1.25, color: [0x2f6fb5, 0xffb300][i >> 1] }));
     [-7.4, -5, -2.6].forEach(z => add('teddy', 31, 2.93, z, { s: 1.5 }));
     add('bullseye', 32, 0, 3.2, { h: 1.7 }); add('bullseye', 33.5, 0, 7.2, { h: 2.9 }); add('bullseye', 35.5, 0, 0, { h: 4.2 });
+
+    // --- Pemberton's collection: wheeled out at last call ---
+    this.W = W; this.finale = []; this.peds = [];
+    const red = flat(0x7a0f1c, { r: 0.6 }), gold = flat(0xd9a520, { r: 0.25, m: 1, env: 1.6 });
+    ['trophy', 'portrait', 'cat', 'condo', 'forsale'].forEach((type, i) => {
+      const z = -3.2 + i * 1.6;
+      const p = sh(B(0.6, 1.7, 0.6, red, 22.4, 0.85, z)), cap = B(0.7, 0.06, 0.7, gold, 22.4, 1.73, z);
+      p.visible = cap.visible = false; this.peds.push(p, cap);
+      this.finale.push(add(type, 22.4, 1.76, z, { finale: true, s: 1.3, color: 0x7fc8ff }));
+    });
+  }
+
+  startFinale() {
+    this.peds.forEach((p, i) => { p.visible = true; if (i % 2 === 0) this.W.statics.push(new THREE.Box3().setFromObject(p)); });
+    this.finale.forEach(t => t.reset());
+  }
+  near(point, r, except) {
+    return this.targets.filter(t => t !== except && t.state === 'alive' && t.c.distanceTo(point) < r + t.r);
   }
 
   where(pos) {
@@ -334,16 +402,16 @@ export class Range {
     const d = _v.length();
     return { pan: Math.max(-1, Math.min(1, _v.x / (Math.abs(_v.z) + 2))), vol: Math.max(0.35, Math.min(1, 1.3 - d / 45)) };
   }
-  score(t, pts, label) {
+  score(t, pts, label, killed = false) {
     const dist = Math.max(0, t.c.x - 14);
-    this.onScore?.(pts * (1 + dist / 22), label, t.c);
+    this.onScore?.(pts * (1 + dist / 22), label, t.c, t, killed);
   }
   // nearest target crossed by the segment p0→p1 (radius pr)
   sweep(p0, p1, pr) {
     let best = null, bt = 2;
     const dx = p1.x - p0.x, dy = p1.y - p0.y, dz = p1.z - p0.z, dd = dx * dx + dy * dy + dz * dz || 1e-6;
     for (const t of this.targets) {
-      if (t.state === 'dead' || t.state === 'fall') continue;
+      if (t.state === 'dead' || t.state === 'fall' || t.state === 'gone') continue;
       const c = t.c, R = t.r + pr;
       let k = ((c.x - p0.x) * dx + (c.y - p0.y) * dy + (c.z - p0.z) * dz) / dd; k = Math.max(0, Math.min(1, k));
       const qx = p0.x + dx * k - c.x, qy = p0.y + dy * k - c.y, qz = p0.z + dz * k - c.z;

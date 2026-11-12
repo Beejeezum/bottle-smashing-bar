@@ -29,7 +29,7 @@ export class AudioSys {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
     this.startMurmur();
-    this.step = 0; this.nextT = ctx.currentTime + 0.2;
+    this.seq = 0; this.nextT = ctx.currentTime + 0.2;
     setInterval(() => this.sched(), 40);
     this.ready = true;
   }
@@ -173,6 +173,34 @@ export class AudioSys {
     this.tone(this.out(0, 0, 1), 'triangle', f, f, this.ctx.currentTime, 0.05, 0.15);
   }
 
+  step(wood, vol = 1) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, wood ? 0.1 : 0.35, vol);
+    if (wood) { this.burst(o, 'lowpass', 420, 180, 0.8, t, 0.07, 0.3); this.tone(o, 'sine', 95, 60, t, 0.07, 0.22); }
+    else this.burst(o, 'bandpass', 1100, 700, 1, t, 0.05, 0.16);
+  }
+  ahh() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, 0.1, 1);
+    this.burst(o, 'bandpass', 1300, 650, 1.4, t, 0.55, 0.16);
+  }
+  cough() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, 0.15, 1);
+    [0, 0.17, 0.3].forEach((d, i) => { this.burst(o, 'bandpass', 700, 420, 1.2, t + d, 0.1, 0.5 - i * 0.12); this.tone(o, 'sawtooth', 150, 90, t + d, 0.08, 0.12); });
+  }
+  cheer(vol = 1) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(-0.5, 0.7, vol);
+    [650, 1100, 2500].forEach(f => this.burst(o, 'bandpass', f, f * 1.15, 2.2, t, 1.3, 0.16));
+    for (let i = 0; i < 5; i++) { const f = rnd(380, 620); this.tone(o, 'triangle', f, f * rnd(1.4, 1.9), t + Math.random() * 0.25, rnd(0.4, 0.8), 0.05); }
+  }
+  bell() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(-0.3, 0.7, 1);
+    [0, 0.45, 0.9].forEach(d => [1, 2.4, 3.9, 5.6].forEach((m, i) => this.tone(o, 'sine', 620 * m, 620 * m, t + d, 1.6 / (i + 1), 0.3 / (i + 1))));
+  }
+
   // ---- ambience --------------------------------------------------------
   startMurmur() {
     const ctx = this.ctx;
@@ -195,10 +223,10 @@ export class AudioSys {
     if (ctx.state !== 'running') return;
     if (this.nextT < ctx.currentTime - 0.5) this.nextT = ctx.currentTime + 0.05;
     while (this.nextT < ctx.currentTime + 0.16) {
-      this.playStep(this.step, this.nextT);
+      this.playStep(this.seq, this.nextT);
       const bpm = 108 - this.drunk * 14;
       this.nextT += 60 / bpm / 3;
-      this.step++;
+      this.seq++;
     }
   }
 

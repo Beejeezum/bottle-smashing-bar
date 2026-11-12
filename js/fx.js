@@ -122,10 +122,10 @@ export class FX {
 
 // Post-process: wobble, double vision, colour fringing, vignette. uDrunk is 0..1.
 export const DrunkShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uDrunk: { value: 0 }, uHit: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uDrunk: { value: 0 }, uHit: { value: 0 }, uSip: { value: 0 }, uBurn: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime, uDrunk, uHit; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uDrunk, uHit, uSip, uBurn; varying vec2 vUv;
     void main(){
       float d = uDrunk; vec2 uv = vUv;
       uv.x += sin(uv.y*6.0 + uTime*1.3) * 0.011 * d;
@@ -141,7 +141,9 @@ export const DrunkShader = {
       col.r = mix(col.r, texture2D(tDiffuse, uv + dir).r, 0.7);
       col.b = mix(col.b, texture2D(tDiffuse, uv - dir).b, 0.7);
       float v = smoothstep(0.95, 0.25, length(vUv - 0.5));
-      col *= mix(1.0, v, 0.4 + 0.35*d);
+      col *= mix(1.0, v, min(1.0, 0.4 + 0.35*d + 0.45*uSip));
+      col += vec3(0.9, 0.3, 0.04) * uBurn * (1.0 - v) * 0.7;
+      col *= 1.0 + uBurn * 0.25;
       float l = dot(col, vec3(0.299, 0.587, 0.114));
       col = mix(vec3(l), col, 1.0 + 0.45*d);
       gl_FragColor = vec4(col, 1.0);

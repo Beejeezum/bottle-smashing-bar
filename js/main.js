@@ -190,7 +190,7 @@ for (let i = 0; i < 12; i++) {
 const motes = (() => {
   const n = 320, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { p[i * 3] = 14 + Math.random() * 18; p[i * 3 + 1] = 0.5 + Math.random() * 8; p[i * 3 + 2] = -9 + Math.random() * 18; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff0d0, size: 0.035, transparent: true, opacity: 0.5, depthWrite: false })); scene.add(m); return m;
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xc8b89a, size: 0.016, transparent: true, opacity: 0.22, depthWrite: false })); scene.add(m); return m;
 })();
 function updateAir(dt) {
   haze.forEach((s, i) => { s.position.x = s.userData.p.x + Math.sin(time * 0.07 + i) * 1.2; s.position.z = s.userData.p.z + Math.cos(time * 0.05 + i * 2) * 1.2; });
@@ -215,7 +215,7 @@ for (const id in W.npc) {
   const pm = new THREE.MeshStandardMaterial({ color: 0xb8742a, roughness: 0.6 }), pg = new THREE.TorusGeometry(0.022, 0.006, 5, 10);
   for (let i = 0; i < 14; i++) { const p = new THREE.Mesh(pg, pm); p.position.set(Math.sin(i * 2.4) * 0.07, 0.06 + (i % 4) * 0.012, Math.cos(i * 2.4) * 0.07); p.rotation.set(i, i * 2, i * 3); g.add(p); }
 }
-let linedT = 0, snackT = 0, tips = 0;
+let linedT = 0, snackT = 0, tips = 0, frenzyT = 0, frenzyScore = 0, frenzyCool = 0;
 const nearSnacks = () => Math.hypot(P.pos.x + 1.7, P.pos.z + 4.4) < 1.5;
 const TOASTS = { tex: 'To ducks.', dol: "To Gerald's misfortune.", hank: 'To the bottle, and its journey.', riv: 'TO NOISE.', lime: 'Woo! Cheers!', gus: 'To winning.', pearl: 'To Gus losing.', pem: '...To parking.', insp: 'I am on duty. ...Cheers.' };
 const toasted = new Set();
@@ -473,6 +473,10 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyF' || e.code === 'Space') { if (dlg) advDlg(); else actionDown = true; e.preventDefault(); }
   if (e.code === 'KeyG') altDown = true;
   if (e.code === 'KeyC') cheers();
+  if (e.code === 'KeyB' && inRange() && frenzyT <= 0 && story.phase !== 'lastcall') {
+    if (time < frenzyCool) say('doug', 'Give me a second to restack.');
+    else { frenzyT = 60; frenzyScore = 0; range.restock(); audio.bell(); toast("DOUG'S SIXTY"); dougTalk = time + 6; say('doug', 'Sixty seconds. The crate of empties is on me. GO.', 3); }
+  }
   if (e.code === 'KeyX' && nearSnacks()) {
     if (time < snackT) say('sal', 'Easy. Those have to last till Thursday.');
     else { snackT = time + 20; linedT = 75; audio.crunch(); say('', pick(['Salty. Stale. Perfect.', 'Stomach: lined. The next few will land softer.', 'These pretzels predate the building.']), 3); }
@@ -584,6 +588,7 @@ range.onScore = (pts, label, pos, t, killed) => {
   fx.popup(pos, '+' + n, label, n >= 600 ? 'big' : '');
   U.uHit.value = 1.5;
   if (killed) { const H = { tv: "GERALD'S TELEVISION DESTROYED. GERALD UNAVAILABLE FOR COMMENT", chandelier: 'CHANDELIER DOWN. REPEAT: CHANDELIER DOWN', disco: 'DISCO BALL DEAD AT 17', duck: "DUCK DOWN. WITNESSES DESCRIBE 'A SQUEAK'", toilet: 'THE THRONE HAS FALLEN', fishbowl: 'FISH REPORTED FINE', gnome: 'GNOME COMMUNITY IN MOURNING', plate: 'CLAY PIGEON INTERCEPTED MID-AIR', piggy: 'PIGGY BANK MAKES LARGE WITHDRAWAL' }[t.type]; if (H) headline(H); }
+  if (frenzyT > 0) frenzyScore += n;
   if (n >= 600) { audio.cheer(0.8); dougSay('big', 0.7); slow = 0.35; }
   if (G.score > store.get('bsb-best')) store.set('bsb-best', G.score);
   story.addJar(n / 25);
@@ -759,6 +764,18 @@ function updateStory(dt) {
     happyT -= dt; el.clock.textContent = 'HAPPY HOUR ' + Math.ceil(happyT); el.clock.classList.add('hot');
     if (happyT <= 0) { W.happy = false; story.dirty = true; sayQ.push(['sal', "Happy hour's over. Back to regular chaos."]); }
   }
+  // Doug's Sixty: a minute of free empties, scored on its own
+  if (frenzyT > 0) {
+    frenzyT -= dt;
+    if (!tray.length) { tray.push({ drink: DRINKS[0], fill: 0, mesh: null }); equip(); drawTray(); }
+    el.eye.className = 'on amber'; el.eye.textContent = "DOUG'S SIXTY · " + Math.ceil(frenzyT) + 's · ' + frenzyScore.toLocaleString();
+    if (frenzyT <= 0) {
+      const best = store.get('bsb-sixty'), rec = frenzyScore > best; if (rec) store.set('bsb-sixty', frenzyScore);
+      frenzyCool = time + 15; el.eye.className = ''; toast('TIME!'); audio.bell(); dougTalk = time + 6;
+      say('doug', frenzyScore.toLocaleString() + (rec ? '. New house record. I am putting it on the wall.' : '. House record is ' + best.toLocaleString() + '. Sweeping up now.'), 5);
+      headline("DOUG'S SIXTY: " + frenzyScore.toLocaleString() + ' POINTS OF DAMAGE');
+    }
+  }
   // restroom: your reflection, and relief
   const rr = W.restroom;
   if (rr.inside(P.pos)) {
@@ -787,7 +804,7 @@ function updateHints(dt) {
   else if (h) p = 'take your empty to the <b>Smash Range</b> →';
   else if (P.pos.z > 10.6 && story.phase === 'saved' && story.night === 1) p = '<kbd>E</kbd> call it a night';
   else if (P.pos.z > 10.3) p = '<kbd>W A S D</kbd> walk in';
-  else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? (range.broken > 0.45 && time > restockT ? 'out of ammo — <kbd>R</kbd> rings for fresh targets' : 'out of ammo — back to the bar') : 'belly up to the bar';
+  else p = waiting.length ? 'your drink is waiting on the bar' : inRange() ? (range.broken > 0.45 && time > restockT ? 'out of ammo — <kbd>R</kbd> rings for fresh targets' : "back to the bar for a drink · or <kbd>B</kbd> for Doug's Sixty") : 'belly up to the bar';
   setPrompt(p);
   if (menuOpen && !nearBar()) openMenu(false);
   if (!seenRange && inRange()) { seenRange = true; toast('THE SMASH RANGE'); say('', 'Finish a drink. Hurl the empty. Everything back there is fair game.', 5); }

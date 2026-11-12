@@ -164,6 +164,12 @@ const BUILD = {
     P(g, CYL, S(0xff6a1a, 0.5), 0, 0, 0, .2, .03, .2); P(g, CYL, S(0x222222, 0.5), 0, .01, 0, .12, .03, .12);
     return { g, r: 0.3, cy: 0 };
   },
+  chime(o) {
+    const g = new THREE.Group(), piv = new THREE.Group(); g.add(piv);
+    P(piv, CYL, S(0xdddddd), 0, -o.L / 2, 0, .004, o.L, .004);
+    const tube = P(piv, CYL, o.i % 2 ? GOLD : S(0xbfc5cc, 0.2, 1), 0, -o.L - o.len / 2, 0, .035, o.len, .035);
+    return { g, r: 0.17, cy: 0, piv, center: tube, L: o.L + o.len / 2 };
+  },
   chandelier(o) {
     const g = new THREE.Group(), piv = new THREE.Group(); g.add(piv);
     P(piv, CYL, BLACK, 0, -o.L / 2, 0, .015, o.L, .015);
@@ -254,6 +260,7 @@ const TYPES = {
   cake: { kind: 'splat', pts: 140, label: 'CAKE', debris: [0xfff6ea, 0xff9ac0, 0xfff6ea, 0xd61f2c] },
   flamingo: { kind: 'knock', pts: 90, label: 'FLAMINGO', snd: 'thud' },
   plate: { kind: 'ceramic', pts: 350, label: 'CLAY PIGEON', debris: [0xff6a1a, 0x222222] },
+  chime: { kind: 'ring', pts: 30, label: 'CHIME' },
   chandelier: { kind: 'chand', pts: 1500, label: 'THE CHANDELIER', hp: 4, swing: true, respawn: 75 },
   popup: { kind: 'ceramic', pts: 250, label: 'POP-UP PEMBERTON', debris: [0xb89a70, 0x8a6a40, 0xe6c2a0], respawn: 4 },
   trophy: { kind: 'ceramic', pts: 1000, label: "PEMBERTON'S TROPHY", debris: [0xd9a520, 0xffe08a], coins: true },
@@ -296,7 +303,12 @@ class Target {
     switch (T.kind) {
       case 'ring':
         this.angV += Math.max(2, Math.min(7, p.vel.length() * 0.3));
-        R.audio.gong({ f: this.o.f ?? 200, ...R.where(this.c) }); R.score(this, T.pts, T.label);
+        if (this.type === 'chime') { // play all eight in order, low to high, for a bonus
+          R.audio.chime({ f: this.o.f, ...R.where(this.c) });
+          R.chimeNext = this.o.i === (R.chimeNext || 0) ? this.o.i + 1 : this.o.i === 0 ? 1 : 0;
+          if (R.chimeNext === 8) { R.chimeNext = 0; R.score(this, 1500, 'YOU PLAYED A SCALE'); }
+        } else R.audio.gong({ f: this.o.f ?? 200, ...R.where(this.c) });
+        R.score(this, T.pts, T.label);
         R.fx.sparks(p.point, 0xffe0a0, 8, 3);
         return 'block';
       case 'spin': {
@@ -442,6 +454,7 @@ export class Range {
     [[19, 4.3], [22.6, 4.9]].forEach(([x, y]) => { const p = cyl(0.03, 0.03, 16, pipe, x, y, 0, 8); p.rotation.x = Math.PI / 2; [-7.5, 7.5].forEach(z => cyl(0.012, 0.012, 9.2 - y, pipe, x, (9.2 + y) / 2, z, 6)); });
     add('pan', 19, 4.3, -3.4, { L: 1.0, f: 196 }); add('pan', 19, 4.3, 2.8, { L: 1.3, f: 147 }); add('pan', 22.6, 4.9, -0.6, { L: 0.9, f: 262 });
     add('pinata', 22.6, 4.9, 5.4, { L: 1.0, ry: 0 });
+    [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 15 / 8, 2].forEach((m, i) => add('chime', 19, 4.3, -1.4 + i * 0.4, { L: 0.45, len: 1.05 - i * 0.075, f: 523.25 * m, i }));
 
     // --- row B (x=24): on a riser so it clears the duck board ---
     const RB = 1.1;

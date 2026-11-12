@@ -68,4 +68,4 @@ Four regulars have a second dare once the first is settled:
 - **Throwing styles beyond two:** a sidearm skip that bounces off the floor.
 - **Pay the jukebox** to queue a song, and more songs.
 - **A morning-after screen** that remembers what you did and what the regulars thought of it.
-- **Touch controls** for phones.
+- **Testing touch controls on real phones.** They exist (left thumb walks, right thumb looks, three buttons) but have only been exercised with simulated touches.

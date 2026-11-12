@@ -85,7 +85,7 @@ let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
 const nearJuke = () => Math.hypot(P.pos.x + 6.9, P.pos.z + 1.5) < 1.5;
 const nearToilet = () => Math.hypot(P.pos.x - W.restroom.toilet.x, P.pos.z - W.restroom.toilet.z) < 1.1;
 const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
-if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('#best').textContent = 'this one needs a keyboard and mouse';
+if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('#best').textContent = 'touch controls are new: left thumb walks, right thumb looks';
 const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your best night: ${best0.toLocaleString()}`;
 const d01 = () => clamp(D.level / 9, 0, 1);
 
@@ -457,6 +457,23 @@ addEventListener('mouseup', e => { if (e.button === 0) actionDown = false; if (e
 canvas.addEventListener('mousedown', e => { if (started && e.button === 2 && locked) altDown = true; });
 addEventListener('contextmenu', e => e.preventDefault());
 
+// touch controls: left thumb walks, right thumb looks, buttons do the rest
+const TM = { x: 0, y: 0 };
+addEventListener('pointerdown', e => { if (e.pointerType === 'touch') { document.body.classList.add('touch'); noLock = true; } }, true);
+function zone(el, onMove, onEnd) {
+  let id = null, sx = 0, sy = 0, lx = 0, ly = 0;
+  el.addEventListener('pointerdown', e => { id = e.pointerId; sx = lx = e.clientX; sy = ly = e.clientY; try { el.setPointerCapture(id); } catch (err) { } e.preventDefault(); });
+  el.addEventListener('pointermove', e => { if (e.pointerId !== id) return; onMove(e.clientX - sx, e.clientY - sy, e.clientX - lx, e.clientY - ly); lx = e.clientX; ly = e.clientY; });
+  const end = e => { if (e.pointerId === id) { id = null; onEnd && onEnd(); } };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+}
+zone($('#t-move'), (dx, dy) => { TM.x = clamp(dx / 55, -1, 1); TM.y = clamp(-dy / 55, -1, 1); }, () => { TM.x = TM.y = 0; });
+zone($('#t-look'), (dx, dy, mx, my) => { if (!started || paused) return; P.yaw -= mx * 0.006 * sens; P.pitch = clamp(P.pitch - my * 0.006 * sens, -1.4, 1.4); });
+const hold = (el, set) => { el.addEventListener('pointerdown', e => { set(true); e.preventDefault(); }); ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => el.addEventListener(n, () => set(false))); };
+hold($('#t-act'), v => { if (v && dlg) advDlg(); else actionDown = v; });
+hold($('#t-lob'), v => { altDown = v; });
+$('#t-e').addEventListener('pointerdown', e => { interact(); e.preventDefault(); });
+
 let talkTo = null;
 function interact() {
   if ($('#receipt').classList.contains('on')) return $('#receipt').classList.remove('on');
@@ -639,11 +656,11 @@ function updatePlayer(dt) {
   const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), look = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
   P.yaw += turn * 1.9 * dt + P.lvx * dt; P.pitch = clamp(P.pitch + look * 1.3 * dt + P.lvy * dt, -1.4, 1.4);
   const decay = Math.exp(-(9 - 6 * d) * dt); P.lvx *= decay; P.lvy *= decay;
-  let ix = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), iz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+  let ix = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + TM.x, iz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) + TM.y;
   if (dlg || peeT > 0) ix = iz = 0;
   if (menuOpen && (ix || iz)) openMenu(false);
   const moving = ix || iz;
-  if (moving) { const l = Math.hypot(ix, iz); ix /= l; iz /= l; ix += Math.sin(time * 0.73) * d * 0.55 + Math.sin(time * 1.9) * d * 0.25; }
+  if (moving) { const l = Math.max(1, Math.hypot(ix, iz)); ix /= l; iz /= l; ix += Math.sin(time * 0.73) * d * 0.55 + Math.sin(time * 1.9) * d * 0.25; }
   const sp = keys.ShiftLeft ? 6.2 : 4.3;
   const fxx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
   const wx = (rx * ix + fxx * iz) * sp, wz = (rz * ix + fz * iz) * sp;

@@ -148,3 +148,15 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #settings { flex-wrap: wrap; justify-content: center; }
 
 #receipt .badge { display: inline-block; font-size: 10px; font-weight: bold; border: 1px solid #1a1512; border-radius: 3px; padding: 1px 5px; margin: 0 2px 5px; }
+
+#touch { display: none; position: absolute; inset: 0; touch-action: none; }
+body.touch #touch { display: block; }
+body.touch #hud #touch > * { pointer-events: auto; touch-action: none; }
+#t-move { position: absolute; left: 0; bottom: 0; width: 42%; height: 62%; }
+#t-look { position: absolute; right: 0; top: 0; width: 58%; height: 100%; }
+#touch button { position: absolute; font: inherit; color: #fff; background: rgba(10,7,9,.45); border: 2px solid rgba(255,255,255,.5); border-radius: 50%; }
+#t-act { right: 22px; bottom: 120px; width: 96px; height: 96px; font-size: 17px; border-color: var(--amber) !important; }
+#t-lob { right: 130px; bottom: 96px; width: 66px; height: 66px; font-size: 16px; }
+#t-e { right: 40px; bottom: 230px; width: 66px; height: 66px; font-size: 24px; border-color: var(--cyan) !important; }
+body.touch #tray { bottom: 330px; } body.touch #helpkey { display: none; }
+body.touch #t-move::after { content: ''; position: absolute; left: 36px; bottom: 150px; width: 90px; height: 90px; border-radius: 50%; border: 2px dashed rgba(255,255,255,.3); }

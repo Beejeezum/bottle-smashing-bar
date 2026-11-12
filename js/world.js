@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import * as TX from './textures.js';
 import { NeonFigure } from './people.js';
 import { DRINKS, makeVessel, vesselGeo } from './drinks.js';
+import { buildRestroom } from './restroom.js';
 
 export function buildWorld(scene) {
   const W = { colliders: [], statics: [], ticks: [], flicker: [], figures: [], npc: {} };
@@ -61,7 +62,12 @@ export function buildWorld(scene) {
   plane(16.6, 18.6, M(cFloor, 5, 6, { rough: 0.5, env: 0.7, bump: 1 }), 0, 0, 1, 0, -Math.PI / 2);
   plane(16.6, 18.6, black, 0, 3.6, 1, 0, Math.PI / 2);
   B(16.6, 3.6, 0.3, brickM(5, 1.4), 0, 1.8, -8.15, { col: 1 });
-  B(0.3, 3.6, 18.6, brickM(6, 1.4), -8.15, 1.8, 1, { col: 1 });
+  // west wall, with a doorway (z 5.8 to 7.2) into the restroom
+  B(0.3, 3.6, 14.1, brickM(4.7, 1.4), -8.15, 1.8, -1.25, { col: 1 });
+  B(0.3, 3.6, 3.1, brickM(1, 1.4), -8.15, 1.8, 8.75, { col: 1 });
+  B(0.3, 1.4, 1.4, brickM(0.5, 0.5), -8.15, 2.9, 6.5);
+  sign('RESTROOM', { color: '#d8ffe6', px: 100 }, 1.5, -7.97, 2.55, 6.5, Math.PI / 2, { boost: 1.3, flicker: 0.05 });
+  buildRestroom(scene, W);
   B(7.3, 5.2, 0.3, brickM(2.4, 2), -4.65, 2.6, 10.15, { col: 1 });
   B(7.3, 5.2, 0.3, brickM(2.4, 2), 4.65, 2.6, 10.15, { col: 1 });
   B(2, 2.7, 0.3, brickM(0.7, 1), 0, 3.85, 10.15);

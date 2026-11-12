@@ -185,6 +185,11 @@ export class AudioSys {
     this.tone(o, 'sine', 180, 60, t, 0.16, 0.7); this.burst(o, 'bandpass', 500, 2600, 1.5, t + 0.03, 0.4, 0.3);
     this.tone(o, 'triangle', 700, 990, t, 0.12, 0.12);
   }
+  stream(dur = 3) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.out(0, 0.5, 1);
+    this.burst(o, 'bandpass', 2600, 2100, 2.5, t, dur, 0.13); this.burst(o, 'lowpass', 500, 380, 1, t, dur, 0.1);
+  }
   step(wood, vol = 1) {
     if (!this.ready) return;
     const t = this.ctx.currentTime, o = this.out(0, wood ? 0.1 : 0.35, vol);

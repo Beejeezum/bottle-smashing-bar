@@ -115,3 +115,12 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #receipt b { font-size: 20px; display: block; }
 #receipt .paid { color: #b0201c; font-weight: bold; border: 2px solid #b0201c; display: inline-block; padding: 2px 8px; transform: rotate(-5deg); margin-top: 10px; }
 #receipt small { display: block; font-size: 11px; opacity: .6; margin-top: 4px; }
+
+#bladder { display: none; align-items: center; gap: 8px; margin-top: 6px; font-size: 15px; color: var(--cyan); }
+#bladder.on { display: flex; }
+#bladder .bar { flex: 1; height: 7px; margin: 0; }
+#bladder i { display: block; height: 100%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+#bladder.hot { color: #ff5a5a; animation: flick .6s infinite; } #bladder.hot i { background: #ff5a5a; box-shadow: 0 0 10px #f00; }
+#settings { margin-top: 26px; display: inline-flex; gap: 26px; padding: 12px 20px; background: rgba(10,7,9,.6); border-radius: 10px; font-size: 18px; cursor: default; }
+#settings label { display: flex; align-items: center; gap: 10px; }
+#settings input { accent-color: var(--amber); width: 140px; }

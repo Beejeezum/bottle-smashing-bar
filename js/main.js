@@ -79,12 +79,14 @@ let started = false, paused = false, locked = false, menuOpen = false;
 let actionDown = false, needRelease = false, mode = 'idle', charge = 0, gulpT = 0, hicT = 8, time = 0;
 let curShot = null, seenRange = false, lastLabel = '', handRise = 0, yelled = 0, sipTilt = 0, stepI = 0;
 let blinkT = 6, blinkP = 1, blinkDur = 0.3, lurchT = 5, dougTalk = 0, slow = 0, blackT = 0, blackouts = 0;
+let bladder = 0, peeT = 0, pees = 0, sawMirror = false, sens = 1;
+const nearToilet = () => Math.hypot(P.pos.x - W.restroom.toilet.x, P.pos.z - W.restroom.toilet.z) < 1.1;
 const store = { get(k) { try { return +localStorage.getItem(k) || 0; } catch (e) { return 0; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } } };
 const best0 = store.get('bsb-best'); if (best0) $('#best').textContent = `your best night: ${best0.toLocaleString()}`;
 const d01 = () => clamp(D.level / 9, 0, 1);
 
 // ---------- HUD ----------
-const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross'), clock: $('#clock'), jarFill: $('#jar-fill'), jarNum: $('#jar-num'), quests: $('#quests'), lids: $('#lids') };
+const el = { score: $('#score-num'), streak: $('#streak'), mult: $('#mult'), smashed: $('#smashed'), tab: $('#tab'), prompt: $('#prompt'), sub: $('#sub'), buzzLabel: $('#buzz-label'), buzzFill: $('#buzz-fill'), tray: $('#tray'), toast: $('#toast'), charge: $('#charge'), menu: $('#menu'), list: $('#menu-list'), hud: $('#hud'), cross: $('#cross'), clock: $('#clock'), jarFill: $('#jar-fill'), jarNum: $('#jar-num'), quests: $('#quests'), lids: $('#lids'), bladder: $('#bladder'), bladderFill: $('#bladder i') };
 let subT = 0, promptText = '', dlg = null;
 const sayQ = [];
 function say(who, text, dur = 3.2) {
@@ -141,7 +143,7 @@ function receipt() {
   const row = (a, b) => '<dt>' + a + '</dt><dd>' + b + '</dd>';
   R.innerHTML = '<h3>THE BOTTLE SMASHING BAR</h3><p>— tonight\'s damage —</p><dl>'
     + row('Bar tab', '$' + G.tab) + row('Things broken', G.smashed) + row('Bottles thrown', G.thrown) + row('Accuracy', acc + '%')
-    + row('Best streak', G.best) + row('Blackouts', blackouts) + row('Doug incidents', G.doug)
+    + row('Best streak', G.best) + row('Blackouts', blackouts) + row('Restroom trips', pees) + row('Doug incidents', G.doug)
     + '</dl><b>SCORE ' + G.score.toLocaleString() + '</b><p class="paid">PAID IN FULL · by the jar</p><small>press E to crumple</small>';
   R.classList.add('on');
 }
@@ -232,6 +234,7 @@ const carrying = () => tray.length + serveQ.length + waiting.length + (serving ?
 function order(id, free) {
   const d = DRINKS.find(x => x.id === id); if (!d) return;
   const n = d.bundle || 1;
+  if (bladder >= 1 && !free) { say('sal', pick(["Go. Restroom. I'm not mopping that again.", "You're doing the dance. West wall, past the pool table. Go."])); audio.tick(220); return; }
   if (carrying() + n > cap()) { say('sal', pick(["Finish what you're holding first, champ.", 'You have two hands. I counted.', "That's a lot of glass for one person."])); audio.tick(220); return; }
   if (!free) G.tab += d.price;
   const li = el.list.querySelector(`[data-id="${id}"]`); li.classList.remove('hit'); void li.offsetWidth; li.classList.add('hit');
@@ -277,12 +280,16 @@ $('#start').addEventListener('click', () => {
   audio.init(); started = true; $('#title').classList.remove('on'); el.hud.classList.add('on'); lock(); drawTray(); hudNumbers();
   setTimeout(() => say('', 'Somewhere inside, glass is breaking. It sounds wonderful.', 4), 600);
 });
-$('#pause').addEventListener('click', () => { paused = false; $('#pause').classList.remove('on'); audio.init(); lock(); });
+const sensEl = $('#sens'), volEl = $('#vol');
+sens = store.get('bsb-sens') || 1; sensEl.value = sens; volEl.value = store.get('bsb-vol') || 0.85;
+sensEl.addEventListener('input', () => { sens = +sensEl.value; store.set('bsb-sens', sens); });
+volEl.addEventListener('input', () => { store.set('bsb-vol', volEl.value); if (audio.ready) audio.master.gain.value = +volEl.value; });
+$('#pause').addEventListener('click', e => { if (e.target.closest('#settings')) return; paused = false; if (audio.ready) audio.master.gain.value = +volEl.value; $('#pause').classList.remove('on'); audio.init(); lock(); });
 addEventListener('mousemove', e => {
   if (!started || paused) return;
   if (locked || (e.buttons & 2)) {
     // sober: 1:1. drunk: part of every movement arrives late, so the view swims
-    const d = d01(), late = d * 0.6, s = 0.0022;
+    const d = d01(), late = d * 0.6, s = 0.0022 * sens;
     P.yaw -= e.movementX * s * (1 - late); P.pitch = clamp(P.pitch - e.movementY * s * (1 - late), -1.4, 1.4);
     const rate = 9 - 6 * d; P.lvx -= e.movementX * s * late * rate; P.lvy -= e.movementY * s * late * rate;
   }
@@ -295,6 +302,11 @@ let talkTo = null;
 function interact() {
   if ($('#receipt').classList.contains('on')) return $('#receipt').classList.remove('on');
   if (dlg) return advDlg();
+  if (peeT > 0) return;
+  if (W.restroom.inside(P.pos) && nearToilet()) {
+    if (bladder < 0.25) return say('', "Nothing to report. You just stand there, companionably.", 3);
+    peeT = 2.2 + bladder * 2; audio.stream(peeT); return;
+  }
   if (talkTo) return startDlg(story.talk(talkTo));
   if (menuOpen) return openMenu(false);
   if (!nearBar()) return;
@@ -407,7 +419,7 @@ function updatePlayer(dt) {
   P.yaw += turn * 1.9 * dt + P.lvx * dt; P.pitch = clamp(P.pitch + look * 1.3 * dt + P.lvy * dt, -1.4, 1.4);
   const decay = Math.exp(-(9 - 6 * d) * dt); P.lvx *= decay; P.lvy *= decay;
   let ix = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), iz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-  if (dlg) ix = iz = 0;
+  if (dlg || peeT > 0) ix = iz = 0;
   if (menuOpen && (ix || iz)) openMenu(false);
   const moving = ix || iz;
   if (moving) { const l = Math.hypot(ix, iz); ix /= l; iz /= l; ix += Math.sin(time * 0.73) * d * 0.55 + Math.sin(time * 1.9) * d * 0.25; }
@@ -439,7 +451,8 @@ function updatePlayer(dt) {
   const sy = (Math.sin(time * 0.83) * 0.6 + Math.sin(time * 1.9 + 1.3) * 0.4) * A;
   const spt = (Math.sin(time * 1.07 + 2) * 0.6 + Math.sin(time * 2.3) * 0.4) * A * 0.7;
   camera.position.set(P.pos.x, 1.66 + Math.sin(P.bob * 2) * 0.035 * Math.min(1, speed / 4) + Math.sin(time * 0.9) * 0.03 * d, P.pos.z);
-  camera.rotation.set(P.pitch + spt + sipTilt + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
+  if (bladder >= 1) camera.position.y += Math.abs(Math.sin(time * 7)) * 0.035; // the dance
+  camera.rotation.set(P.pitch + spt + sipTilt + (bladder >= 1 ? Math.sin(time * 9) * 0.012 : 0) + fx.kick * 0.006 * Math.sin(time * 70), P.yaw + sy, Math.sin(time * 0.61) * A * 0.9 - (ix * 0.012 * Math.min(1, speed / 4)));
   const fov = 72 + Math.sin(time * 0.5) * 4 * d + (keys.ShiftLeft && moving ? 3 : 0);
   if (Math.abs(fov - camera.fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
   camera.updateMatrixWorld();
@@ -448,7 +461,10 @@ function updatePlayer(dt) {
 const hp = new THREE.Vector3(), hr = new THREE.Vector3();
 function finishDrink(h) {
   h.fill = 0; h.mesh?.userData.setFill(0); needRelease = true; mode = 'idle'; drawTray();
-  const d = d01(), st = h.drink.strength;
+  const d = d01(), st = h.drink.strength, was = bladder;
+  bladder = Math.min(1.2, bladder + (h.drink.id === 'water' ? 0.24 : 0.16));
+  if (bladder >= 0.75 && was < 0.75) sayQ.push(['', 'You should find the restroom soon. West wall, past the pool table.']);
+  if (bladder >= 1 && was < 1) sayQ.push(['', 'It is now an emergency.']);
   setTimeout(() => audio.ahh(), 150);
   if (st >= 2) { U.uBurn.value = Math.min(1.6, st / 2.6); fx.kick = 1; if (st >= 2.6 || h.drink.id === 'tequila') setTimeout(() => audio.cough(), 350); }
   else if (Math.random() < 0.3 + d * 0.4) setTimeout(() => audio.burp(), 700);
@@ -552,13 +568,26 @@ function updateStory(dt) {
     el.jarFill.style.width = (story.jar / story.goal * 100) + '%'; el.jarNum.textContent = `$${Math.floor(story.jar).toLocaleString()} / $${story.goal.toLocaleString()}`;
     el.clock.classList.toggle('hot', story.phase !== 'night');
   }
+  // restroom: your reflection, and relief
+  const rr = W.restroom;
+  if (rr.inside(P.pos)) {
+    rr.reflect(P.pos, P.yaw);
+    if (!sawMirror && P.pos.z < 6 && P.pos.x < -9) { sawMirror = true; sayQ.push(['', pick(['You look incredible. You look like a sign for a bar.', 'So that is what you are made of. Huh. Glass tubes.'])]); }
+  } else rr.me.group.visible = false;
+  if (peeT > 0) {
+    peeT -= dt; el.lids.style.setProperty('--lid', '0.42');
+    if (peeT <= 0) { bladder = 0; pees++; el.lids.style.setProperty('--lid', '0'); audio.ahh(); say('', pick(['Better. So much better.', 'A new person walks out of here.', 'You read all the graffiti. Twice.']), 3); }
+  }
+  el.bladder.classList.toggle('on', bladder >= 0.5); el.bladder.classList.toggle('hot', bladder >= 1);
+  el.bladderFill.style.width = Math.min(100, bladder * 100) + '%';
   if (partyT > 0) { partyT -= dt; if (Math.random() < dt * 14) { _c.set(P.pos.x + (Math.random() - 0.5) * 9, 3 + Math.random() * 2, P.pos.z + (Math.random() - 0.5) * 9); fx.confetti(_c, 14); } }
 }
 
 function updateHints(dt) {
   const h = tray[0];
   let p = '';
-  if (menuOpen || dlg) p = '';
+  if (menuOpen || dlg || peeT > 0) p = '';
+  else if (W.restroom.inside(P.pos)) p = nearToilet() ? "<kbd>E</kbd> answer nature's call" : '';
   else if (talkTo) p = `<kbd>E</kbd> talk to <b>${CAST[talkTo].name}</b>`;
   else if (nearBar()) p = waiting.length && tray.length >= cap() ? 'hands full — your drink is waiting on the bar' : '<kbd>E</kbd> order a drink';
   else if (h && h.fill > 0) p = '<kbd>hold click</kbd> drink';
@@ -601,5 +630,5 @@ $('#loading')?.remove(); $('#start').disabled = false;
 // handy for poking at the game from the console
 window.game = { P, D, G, tray, order, W, range, audio, shots, story, interact, DG, get mode() { return mode; }, get dlg() { return dlg; }, get talkTo() { return talkTo; },
   tp(x, z, yaw = P.yaw, pitch = P.pitch) { P.pos.set(x, 0, z); P.yaw = yaw; P.pitch = pitch; },
-  press(v) { actionDown = v; },
+  press(v) { actionDown = v; }, get bladder() { return bladder; }, set bladder(v) { bladder = v; },
   run(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); composer.render(); }, };

@@ -367,6 +367,8 @@ const ARC_N = 34;
 const arcGeo = new THREE.BufferGeometry(); arcGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_N * 3), 3));
 const arc = new THREE.Points(arcGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 4, sizeAttenuation: false, transparent: true, opacity: 0.8, depthWrite: false }));
 arc.frustumCulled = false; arc.visible = false; scene.add(arc);
+const landing = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.2, 24), new THREE.MeshBasicMaterial({ color: 0x9dff00, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }));
+landing.rotation.x = -Math.PI / 2; landing.visible = false; scene.add(landing);
 
 function equip() {
   const h = tray[0];
@@ -578,6 +580,12 @@ function updateShots(dt) {
         s.hit = true; G.doug++; headline('DOUG STRUCK. AGAIN. RULE THREE IGNORED'); smashShot(s, p); G.streak = 0; G.score = Math.max(0, G.score - 250); hudNumbers();
         fx.popup(p, '-250', 'RULE THREE', 'bad'); dougTalk = 0; dougSay('ow'); audio.thud(range.where(p)); break;
       }
+      if (IN.on && Math.hypot(p.x - insp.group.position.x, p.z - insp.group.position.z) < 0.4 && p.y < 1.9) { // do not bottle the inspector
+        s.hit = true; smashShot(s, p); story.fine(300); toast('ASSAULT WITH A LAGER'); fx.popup(p, '-$300', 'THE INSPECTOR', 'bad'); headline('INSPECTOR BOTTLED. FINE TRIPLED'); sayQ.push(['insp', 'That is going in the report. In CAPITALS.']); break;
+      }
+      if (pem.group.visible && pem.pose === 'chat' && Math.hypot(p.x - pem.group.position.x, p.z - pem.group.position.z) < 0.4 && p.y < 2.1) {
+        s.hit = true; smashShot(s, p); G.score += 50; hudNumbers(); fx.popup(p, '+50', 'WORTH IT', 'call'); sayQ.push(['pem', pick(['My SUIT! This is Italian neon!', 'I will be invoicing you for that.'])]); break;
+      }
       const hit = range.sweep(_a, p, story.has('heavy') ? 0.17 : 0.1);
       if (hit) {
         _b.lerpVectors(_a, p, hit.k); curShot = s;
@@ -723,11 +731,13 @@ function updateAction(dt) {
 
   // aim arc: generous when sober, fades out as you get drunk
   const show = mode === 'charge' ? clamp(1 - d * (story.has('liver') ? 1.05 : 1.7), 0, 1) : 0;
-  arc.visible = show > 0.02;
+  arc.visible = landing.visible = show > 0.02;
   if (arc.visible) {
     throwOrigin(_o); aimDir(_dir, 0).multiplyScalar(throwSpeed(charge));
     const pa = arcGeo.attributes.position; let x = _o.x + _dir.x * 0.06, z = _o.z + _dir.z * 0.06, vy = _dir.y - 9.8 * 0.06, y = _o.y + _dir.y * 0.06;
     for (let i = 0; i < ARC_N; i++) { pa.setXYZ(i, x, Math.max(y, 0.02), z); x += _dir.x * 0.045; z += _dir.z * 0.045; vy -= 9.8 * 0.045; y += vy * 0.045; }
+    for (let i = 0; i < 90 && y > 0.06 && x < 37.5; i++) { x += _dir.x * 0.045; z += _dir.z * 0.045; vy -= 9.8 * 0.045; y += vy * 0.045; } // where it comes down
+    landing.position.set(x, Math.max(y, 0.06), z); landing.material.opacity = 0.6 * show;
     pa.needsUpdate = true; arc.material.opacity = 0.75 * show;
   }
   el.charge.style.strokeDashoffset = 100.5 * (1 - (mode === 'charge' ? charge : 0));

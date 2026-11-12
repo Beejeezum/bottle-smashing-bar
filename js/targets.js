@@ -518,13 +518,13 @@ export class Range {
     this.finale.forEach(t => t.reset());
   }
   pull() {
-    const side = Math.random() < 0.5 ? -1 : 1, n = Math.random() < 0.35 ? 2 : 1; let k = 0;
+    const side = Math.random() < 0.5 ? -1 : 1, n = Math.random() < 0.35 ? 2 : 1; let k = 0, first = null;
     for (const p of this.plates) {
       if (p.state !== 'gone' || k >= n) continue;
       p.reset(); p.pop = 1; p.g.scale.setScalar(p.s);
-      p.g.position.set(18.8 + k * 1.6, 0.9, -10.2 * side); p.v.set(1 + Math.random() * 3, 9 + Math.random() * 1.5, side * (6.5 + Math.random() * 2)); p.center(); k++;
+      p.g.position.set(18.8 + k * 1.6, 0.9, -10.2 * side); p.v.set(1 + Math.random() * 3, 9 + Math.random() * 1.5, side * (6.5 + Math.random() * 2)); p.center(); k++; first ??= p;
     }
-    if (k) { this.audio.pull(); this.fx.popup(this.plates[0].c, 'PULL!', k > 1 ? 'DOUBLE' : '', 'call'); }
+    if (k) { this.audio.pull(); this.fx.popup(first.c, 'PULL!', k > 1 ? 'DOUBLE' : '', 'call'); }
   }
   restock() {
     let n = 0;
@@ -560,6 +560,7 @@ export class Range {
   }
   update(dt, t) {
     this.convT = (this.convT || 0) + dt * (this.tempo || 1);
+    if (this.active) { this.quackT = (this.quackT ?? 6) - dt; if (this.quackT <= 0) { this.quackT = 5 + Math.random() * 9; const d = this.targets.find(t => t.type === 'duck' && t.state === 'alive'); if (d) this.audio.squeak({ ...this.where(d.c), vol: 0.25 }); } }
     for (const x of this.targets) x.update(dt, t);
     if (this.active) { this.skeetT -= dt; if (this.skeetT <= 0) { this.skeetT = 12 + Math.random() * 9; this.pull(); } }
     this.tvT -= dt;

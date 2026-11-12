@@ -135,7 +135,7 @@ kbd { font: inherit; padding: .05em .45em; border: 1px solid rgba(255,255,255,.4
 #eye.amber { color: var(--amber); }
 #eye.red { color: #fff; background: #c0181f; animation: flick .5s infinite; box-shadow: 0 0 18px #f00; }
 
-#helpkey { position: absolute; left: 28px; top: 112px; font-size: 15px; opacity: .55; }
+#helpkey { position: absolute; left: 28px; top: 138px; font-size: 15px; opacity: .55; }
 #help { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%) scale(.96); width: min(560px, 92vw); padding: 20px 26px 14px; background: rgba(12,14,22,.93); border: 2px solid var(--cyan); border-radius: 12px; box-shadow: 0 0 40px rgba(0,229,255,.35); opacity: 0; transition: opacity .18s, transform .18s; }
 #help.on { opacity: 1; transform: translate(-50%, -50%); }
 #help h3 { font-family: 'Permanent Marker', cursive; font-weight: 400; letter-spacing: 0; font-size: 28px; color: var(--cyan); text-align: center; margin-bottom: 10px; }
